@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}Search — LeadFinder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Search</h1>
+    <p class="page-subtitle">Enter a query — LeadFinder will find business contacts from the top results</p>
+  </div>
+</div>
+
+<!-- ── Search form ────────────────────────────────────────────────────────── -->
+<div class="card search-card">
+  <form id="search-form" class="search-form" onsubmit="return false;">
+    <div class="search-input-wrap">
+      <svg class="search-icon" viewBox="0 0 20 20" fill="none">
+        <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+        <path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <input
+        type="text"
+        id="query-input"
+        class="search-input"
+        placeholder='e.g. "roofing companies Chicago" or "SaaS marketing agencies"'
+        autocomplete="off"
+        autofocus
+      />
+    </div>
+    <div class="search-options">
+      <label class="option-label">
+        Max results
+        <select id="max-results" class="select-sm">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+          <option value="30">30</option>
+        </select>
+      </label>
+      <button type="submit" id="search-btn" class="btn btn-primary" onclick="runSearch()">
+        Search
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- ── Status / progress ─────────────────────────────────────────────────── -->
+<div id="search-status" class="search-status hidden">
+  <div class="status-pulse"></div>
+  <span id="status-text" class="mono">Initialising…</span>
+</div>
+
+<!-- ── Error ─────────────────────────────────────────────────────────────── -->
+<div id="search-error" class="alert alert-error hidden"></div>
+
+<!-- ── Results ───────────────────────────────────────────────────────────── -->
+<div id="results-section" class="hidden">
+
+  <div class="card mt-6">
+    <div class="card-header-row">
+      <div class="card-header">Run summary</div>
+      <a id="view-all-leads" href="{{ url_for('views.leads') }}" class="card-action">View all leads →</a>
+    </div>
+    <div id="summary-grid" class="summary-grid"></div>
+  </div>
+
+  <div class="card mt-6">
+    <div class="card-header-row">
+      <div class="card-header">Contacts found</div>
+      <span id="lead-count" class="card-count mono"></span>
+    </div>
+
+    <div id="leads-output"></div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function runSearch() {
+  const query = document.getElementById('query-input').value.trim();
+  const maxResults = parseInt(document.getElementById('max-results').value, 10);
+
+  if (!query) {
+    document.getElementById('query-input').focus();
+    return;
+  }
+
+  // Reset UI
+  hide('search-error');
+  hide('results-section');
+  show('search-status');
+  setStatus('Sending query to SerpAPI…');
+  setBtnLoading(true);
+
+  try {
+    setStatus('Fetching SERP results and scraping pages…');
+
+    const resp = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, max_results: maxResults })
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      throw new Error(data.error || `HTTP ${resp.status}`);
+    }
+
+    setStatus(`Done — ${data.leads.length} contact(s) found`);
+    renderResults(data);
+
+  } catch (err) {
+    hide('search-status');
+    showError(err.message);
+  } finally {
+    setBtnLoading(false);
+  }
+}
+
+function renderResults(data) {
+  hide('search-status');
+  show('results-section');
+
+  const s = data.summary || {};
+
+  // Update leads link with query filter
+  const q = encodeURIComponent(data.query || '');
+  document.getElementById('view-all-leads').href = `/leads?query=${q}`;
+
+  // Summary grid
+  document.getElementById('summary-grid').innerHTML = `
+    <div class="summary-item"><div class="summary-val mono">${s.total_serp_results ?? '—'}</div><div class="summary-key">SERP results</div></div>
+    <div class="summary-item"><div class="summary-val mono">${s.pages_fetched ?? '—'}</div><div class="summary-key">Pages fetched</div></div>
+    <div class="summary-item"><div class="summary-val mono accent">${s.contacts_found ?? '—'}</div><div class="summary-key">Contacts found</div></div>
+    <div class="summary-item"><div class="summary-val mono muted">${s.pages_skipped ?? '—'}</div><div class="summary-key">Skipped</div></div>
+    <div class="summary-item"><div class="summary-val mono warn">${s.pages_failed ?? '—'}</div><div class="summary-key">Failed</div></div>
+    <div class="summary-item"><div class="summary-val mono muted">${s.skipped_denylisted ?? '—'}</div><div class="summary-key">Denylisted</div></div>
+  `;
+
+  // Lead count
+  document.getElementById('lead-count').textContent = `${data.leads.length} total`;
+
+  // Leads list
+  const container = document.getElementById('leads-output');
+  if (!data.leads.length) {
+    container.innerHTML = `<div class="empty-state"><p>No contacts extracted from this search.</p><p class="muted small">Try a more specific query, or check that your SERP_API_KEY is valid.</p></div>`;
+    return;
+  }
+
+  const rows = data.leads.map(lead => {
+    const badge = confidenceBadge(lead.confidence);
+    const typeTag = lead.contact_type === 'email'
+      ? `<span class="type-tag type-email">EMAIL</span>`
+      : `<span class="type-tag type-phone">PHONE</span>`;
+    const domain = lead.domain || '—';
+    const method = lead.method || '—';
+    const seen   = lead.seen_count > 1 ? `<span class="seen-badge">×${lead.seen_count}</span>` : '';
+    return `
+      <div class="lead-row">
+        <div class="lead-main">
+          <div class="lead-value mono">&gt; ${escHtml(lead.normalized_value)} ${seen}</div>
+          <div class="lead-meta">
+            ${typeTag} ${badge}
+            <span class="muted small">· ${escHtml(domain)} · via ${escHtml(method)}</span>
+          </div>
+        </div>
+        <button class="copy-btn" onclick="copyText('${escAttr(lead.normalized_value)}')" title="Copy">
+          <svg viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 11V3.5A1.5 1.5 0 0 1 4.5 2H11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = `<div class="leads-list">${rows}</div>`;
+}
+
+function confidenceBadge(conf) {
+  const map = {
+    high:   '<span class="badge badge-high">[ HIGH ]</span>',
+    medium: '<span class="badge badge-med">[ MED ]</span>',
+    low:    '<span class="badge badge-low">[ LOW ]</span>',
+  };
+  return map[conf] || `<span class="badge badge-low">[ ${(conf||'?').toUpperCase()} ]</span>`;
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Copied!');
+  });
+}
+
+function setStatus(msg) {
+  document.getElementById('status-text').textContent = msg;
+}
+
+function setBtnLoading(loading) {
+  const btn = document.getElementById('search-btn');
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Searching…' : 'Search';
+}
+
+function showError(msg) {
+  const el = document.getElementById('search-error');
+  el.textContent = `Error: ${msg}`;
+  el.classList.remove('hidden');
+}
+
+function show(id)  { document.getElementById(id)?.classList.remove('hidden'); }
+function hide(id)  { document.getElementById(id)?.classList.add('hidden'); }
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s){ return String(s).replace(/'/g,"&#39;").replace(/"/g,'&quot;'); }
+
+// Allow Enter key to trigger search
+document.getElementById('query-input')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') runSearch();
+});
+</script>
+{% endblock %}

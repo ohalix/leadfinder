@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}LeadFinder{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+  <!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-mark">LF</span>
+      <span class="logo-text">LeadFinder</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="{{ url_for('views.index') }}"
+         class="nav-item {% if request.endpoint == 'views.index' %}active{% endif %}">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="12" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="12" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+        Overview
+      </a>
+      <a href="{{ url_for('views.search') }}"
+         class="nav-item {% if request.endpoint == 'views.search' %}active{% endif %}">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Search
+      </a>
+      <a href="{{ url_for('views.leads') }}"
+         class="nav-item {% if request.endpoint == 'views.leads' %}active{% endif %}">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 5h14M3 10h14M3 15h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Leads
+      </a>
+      <a href="{{ url_for('views.leads_export') }}"
+         class="nav-item {% if request.endpoint == 'views.leads_export' %}active{% endif %}">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3v9m0 0-3-3m3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 14v1a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Export
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <span class="sidebar-version">v1.0</span>
+      <a href="/api/health" class="sidebar-health" target="_blank">API</a>
+    </div>
+  </aside>
+
+  <!-- ── Main content ──────────────────────────────────────────────────────── -->
+  <main class="main">
+    <div class="main-inner">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

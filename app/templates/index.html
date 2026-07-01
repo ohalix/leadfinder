@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Overview — LeadFinder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Overview</h1>
+    <p class="page-subtitle">SERP-powered business contact discovery</p>
+  </div>
+  <a href="{{ url_for('views.search') }}" class="btn btn-primary">+ New Search</a>
+</div>
+
+<!-- ── Stats row ─────────────────────────────────────────────────────────── -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total Leads</div>
+    <div class="stat-value mono">{{ total_leads }}</div>
+    <div class="stat-sub">unique contacts stored</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Search Runs</div>
+    <div class="stat-value mono">{{ total_runs }}</div>
+    <div class="stat-sub">queries executed</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Emails</div>
+    <div class="stat-value mono">{{ by_type.get('email', 0) }}</div>
+    <div class="stat-sub">of total leads</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Phones</div>
+    <div class="stat-value mono">{{ by_type.get('phone', 0) }}</div>
+    <div class="stat-sub">of total leads</div>
+  </div>
+</div>
+
+<!-- ── Confidence breakdown + pipeline ──────────────────────────────────── -->
+<div class="two-col">
+
+  <div class="card">
+    <div class="card-header">Confidence breakdown</div>
+    <div class="confidence-bars">
+      {% set total_conf = (by_confidence.get('high',0) + by_confidence.get('medium',0) + by_confidence.get('low',0)) or 1 %}
+      <div class="conf-row">
+        <span class="badge badge-high">[ HIGH ]</span>
+        <div class="conf-bar-wrap">
+          <div class="conf-bar conf-bar-high" style="width:{{ ((by_confidence.get('high',0) / total_conf) * 100)|round|int }}%"></div>
+        </div>
+        <span class="conf-count mono">{{ by_confidence.get('high', 0) }}</span>
+      </div>
+      <div class="conf-row">
+        <span class="badge badge-med">[ MED ]</span>
+        <div class="conf-bar-wrap">
+          <div class="conf-bar conf-bar-med" style="width:{{ ((by_confidence.get('medium',0) / total_conf) * 100)|round|int }}%"></div>
+        </div>
+        <span class="conf-count mono">{{ by_confidence.get('medium', 0) }}</span>
+      </div>
+      <div class="conf-row">
+        <span class="badge badge-low">[ LOW ]</span>
+        <div class="conf-bar-wrap">
+          <div class="conf-bar conf-bar-low" style="width:{{ ((by_confidence.get('low',0) / total_conf) * 100)|round|int }}%"></div>
+        </div>
+        <span class="conf-count mono">{{ by_confidence.get('low', 0) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Extraction pipeline</div>
+    <ol class="pipeline-steps">
+      <li><span class="step-num">01</span><span class="step-label">SERP query via SerpAPI</span><span class="step-tag">organic · answer box · AI overview</span></li>
+      <li><span class="step-num">02</span><span class="step-label">Domain denylist filter</span><span class="step-tag">LinkedIn, Facebook, Yelp …</span></li>
+      <li><span class="step-num">03</span><span class="step-label">robots.txt compliance check</span><span class="step-tag">Protego · per-domain cache</span></li>
+      <li><span class="step-num">04</span><span class="step-label">Page fetch with retry</span><span class="step-tag">httpx · tenacity backoff</span></li>
+      <li><span class="step-num">05</span><span class="step-label">Playwright fallback</span><span class="step-tag">JS-shell detection only</span></li>
+      <li><span class="step-num">06</span><span class="step-label">4-tier contact extraction</span><span class="step-tag">schema → mailto → DOM → text</span></li>
+      <li><span class="step-num">07</span><span class="step-label">Normalize &amp; deduplicate</span><span class="step-tag">E.164 · lowercase · seen-count</span></li>
+    </ol>
+  </div>
+
+</div>
+
+<!-- ── Recent runs ───────────────────────────────────────────────────────── -->
+<div class="card mt-6">
+  <div class="card-header-row">
+    <div class="card-header">Recent searches</div>
+    <a href="{{ url_for('views.search') }}" class="card-action">+ New search</a>
+  </div>
+
+  {% if recent_runs %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Query</th>
+        <th>Engine</th>
+        <th>Contacts</th>
+        <th>Results</th>
+        <th>Status</th>
+        <th>Run at</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in recent_runs %}
+      <tr>
+        <td class="mono">{{ run.query }}</td>
+        <td><span class="tag">{{ run.source_engine }}</span></td>
+        <td class="mono accent">{{ run.total_contacts_found }}</td>
+        <td class="mono muted">{{ run.total_result_count }}</td>
+        <td>
+          <span class="status-dot {% if run.status == 'completed' %}status-ok{% elif run.status == 'failed' %}status-fail{% else %}status-run{% endif %}"></span>
+          {{ run.status }}
+        </td>
+        <td class="mono muted small">{{ run.created_at[:16] if run.created_at else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <p>No searches yet.</p>
+    <a href="{{ url_for('views.search') }}" class="btn btn-primary btn-sm">Run your first search →</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

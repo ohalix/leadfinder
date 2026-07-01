@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Export — LeadFinder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Export</h1>
+    <p class="page-subtitle">Download leads as CSV — filters apply to the export</p>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- ── Filter & download ────────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header">Export options</div>
+
+    <form id="export-form" class="export-form" onsubmit="return false;">
+      <label class="form-label">
+        Filter by query
+        <input type="text" id="exp-query" class="form-input" placeholder="e.g. roofing companies Chicago" />
+      </label>
+      <label class="form-label">
+        Filter by domain
+        <input type="text" id="exp-domain" class="form-input" placeholder="e.g. example.com" />
+      </label>
+      <label class="form-label">
+        Confidence
+        <select id="exp-confidence" class="form-select">
+          <option value="">All</option>
+          <option value="high">[ HIGH ] only</option>
+          <option value="medium">[ MED ] only</option>
+          <option value="low">[ LOW ] only</option>
+        </select>
+      </label>
+      <label class="form-label">
+        Contact type
+        <select id="exp-type" class="form-select">
+          <option value="">All</option>
+          <option value="email">Emails only</option>
+          <option value="phone">Phones only</option>
+        </select>
+      </label>
+
+      <div class="export-actions">
+        <button type="button" class="btn btn-primary" onclick="downloadCSV()">
+          Download CSV
+        </button>
+        <button type="button" class="btn btn-ghost" onclick="previewAPI()">
+          Preview API URL
+        </button>
+      </div>
+    </form>
+
+    <div id="api-url-preview" class="code-preview hidden"></div>
+  </div>
+
+  <!-- ── Column reference ─────────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header">CSV columns</div>
+    <table class="data-table col-ref-table">
+      <thead>
+        <tr><th>Column</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="mono">id</td><td>UUID for the lead</td></tr>
+        <tr><td class="mono">contact_type</td><td>email or phone</td></tr>
+        <tr><td class="mono">normalized_value</td><td>Cleaned value (E.164 / lowercase)</td></tr>
+        <tr><td class="mono">raw_value</td><td>Original value as extracted</td></tr>
+        <tr><td class="mono">domain</td><td>Website where this contact was found</td></tr>
+        <tr><td class="mono">method</td><td>Extraction method: schema, mailto, tel, footer, text</td></tr>
+        <tr><td class="mono">confidence</td><td>high / medium / low</td></tr>
+        <tr><td class="mono">seen_count</td><td>Times this contact was found across runs</td></tr>
+        <tr><td class="mono">first_seen</td><td>Datetime of first discovery</td></tr>
+        <tr><td class="mono">last_seen</td><td>Datetime of most recent discovery</td></tr>
+        <tr><td class="mono">source_urls</td><td>Semicolon-separated list of source pages</td></tr>
+        <tr><td class="mono">queries</td><td>Semicolon-separated list of originating queries</td></tr>
+        <tr><td class="mono">source_engine</td><td>SERP provider used (e.g. serpapi)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="mt-4">
+      <div class="card-header">Direct API access</div>
+      <p class="muted small mt-2">You can also export programmatically:</p>
+      <pre class="code-block">GET /api/leads/export?confidence=high&contact_type=email</pre>
+      <pre class="code-block mt-2">GET /api/leads?query=roofing&limit=100</pre>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function buildParams() {
+  const params = new URLSearchParams();
+  const q    = document.getElementById('exp-query').value.trim();
+  const dom  = document.getElementById('exp-domain').value.trim();
+  const conf = document.getElementById('exp-confidence').value;
+  const type = document.getElementById('exp-type').value;
+  if (q)    params.set('query', q);
+  if (dom)  params.set('domain', dom);
+  if (conf) params.set('confidence', conf);
+  if (type) params.set('contact_type', type);
+  return params;
+}
+
+function downloadCSV() {
+  const params = buildParams();
+  const url = `/api/leads/export?${params.toString()}`;
+  window.location.href = url;
+}
+
+function previewAPI() {
+  const params = buildParams();
+  const url = `/api/leads/export?${params.toString()}`;
+  const el  = document.getElementById('api-url-preview');
+  el.textContent = url;
+  el.classList.remove('hidden');
+}
+</script>
+{% endblock %}
