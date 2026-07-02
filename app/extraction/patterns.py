@@ -9,19 +9,15 @@ Priority order within this module:
 Junk filters are applied inline so no noise reaches the normalizer.
 """
 from __future__ import annotations
-
 import logging
 import re
 from typing import List, Set
-
 from bs4 import BeautifulSoup
-
 from app.models import ExtractionHit
 
 logger = logging.getLogger(__name__)
 
-# ── Regex patterns ─────────────────────────────────────────────────────────────
-
+# ── Regex patterns ──
 EMAIL_RE = re.compile(
     r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",
 )
@@ -61,7 +57,6 @@ _ZONE_SELECTORS = [
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
-
 def extract_patterns(html: str, source_url: str) -> List[ExtractionHit]:
     """Run tiers 2, 3, 4 and return all hits (deduplicated within this call)."""
     hits: List[ExtractionHit] = []
@@ -71,12 +66,10 @@ def extract_patterns(html: str, source_url: str) -> List[ExtractionHit]:
         _tier3_zones(soup, source_url, hits)
         _tier4_body(soup, source_url, hits)
     except Exception as exc:
-        logger.debug("Pattern extraction error on %s: %s", source_url, exc)
+        logger.debug(f"Pattern extraction error on {source_url}: {exc}", source_url, exc)
     return hits
 
-
-# ── Tier 2 — explicit href links ──────────────────────────────────────────────
-
+# ── Tier 2 — explicit href links ──
 def _tier2_links(
     soup: BeautifulSoup, source_url: str, hits: List[ExtractionHit]
 ) -> None:
@@ -107,9 +100,7 @@ def _tier2_links(
                     source_url=source_url,
                 ))
 
-
-# ── Tier 3 — semantic DOM zones ───────────────────────────────────────────────
-
+# ── Tier 3 — semantic DOM zones ──
 def _tier3_zones(
     soup: BeautifulSoup, source_url: str, hits: List[ExtractionHit]
 ) -> None:
@@ -150,9 +141,7 @@ def _tier3_zones(
                         source_url=source_url,
                     ))
 
-
-# ── Tier 4 — full body text ────────────────────────────────────────────────────
-
+# ── Tier 4 — full body text ──
 def _tier4_body(
     soup: BeautifulSoup, source_url: str, hits: List[ExtractionHit]
 ) -> None:

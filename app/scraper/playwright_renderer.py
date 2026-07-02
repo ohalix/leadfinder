@@ -12,15 +12,13 @@ Install (after pip install playwright):
     playwright install chromium
 """
 from __future__ import annotations
-
 import logging
 import re
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# ── Optional import ───────────────────────────────────────────────────────────
-
+# ── Optional import ──
 _available = False
 try:
     from playwright.sync_api import (  # type: ignore
@@ -34,10 +32,8 @@ except ImportError:
         "pip install playwright && playwright install chromium"
     )
 
-# ── Public helpers ────────────────────────────────────────────────────────────
-
+# ── Public helpers ──
 _STRIP_TAGS = re.compile(r"<[^>]+>")
-
 
 def is_js_shell(html: str) -> bool:
     """
@@ -53,7 +49,6 @@ def is_js_shell(html: str) -> bool:
     body_text = " ".join(_STRIP_TAGS.sub(" ", html).split())
     return len(body_text) < 200
 
-
 def render_page(url: str, timeout_ms: int = 15_000) -> Optional[str]:
     """
     Renders *url* in a headless Chromium browser and returns the full HTML.
@@ -62,7 +57,7 @@ def render_page(url: str, timeout_ms: int = 15_000) -> Optional[str]:
     This function is intentionally synchronous to keep the Flask app simple.
     """
     if not _available:
-        logger.debug("Playwright unavailable — skipping render for %s", url)
+        logger.debug(f"Playwright unavailable — skipping render for {url}")
         return None
 
     try:
@@ -83,20 +78,19 @@ def render_page(url: str, timeout_ms: int = 15_000) -> Optional[str]:
                     page.wait_for_load_state("networkidle", timeout=timeout_ms)
                 except _PWTimeout:
                     # networkidle can hang on sites with long-polling; proceed anyway
-                    logger.debug("networkidle timeout on %s — using partial content", url)
+                    logger.debug(f"networkidle timeout on {url} — using partial content")
             except _PWTimeout:
-                logger.warning("Playwright navigation timeout on %s", url)
+                logger.warning(f"Playwright navigation timeout on {url}")
                 # Still try to grab whatever rendered
             except Exception as exc:
-                logger.warning("Playwright navigation error on %s: %s", url, exc)
+                logger.warning(f"Playwright navigation error on {url}: {exc}")
                 browser.close()
                 return None
 
             html = page.content()
             browser.close()
-            logger.info("Playwright rendered %s (%d chars)", url, len(html))
+            logger.info(f"Playwright rendered {url} ({len(html)} chars)")
             return html
-
     except Exception as exc:
-        logger.warning("Playwright render failure for %s: %s", url, exc)
+        logger.warning(f"Playwright render failure for {url}: {exc}")
         return None

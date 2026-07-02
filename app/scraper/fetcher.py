@@ -7,11 +7,9 @@ HTTP page fetcher.
 - Returns a typed FetchOutcome so callers never raise, they always branch.
 """
 from __future__ import annotations
-
 import logging
 import time
 from typing import Optional
-
 import httpx
 from tenacity import (
     retry,
@@ -19,12 +17,10 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential_jitter,
 )
-
 from app.models import FetchOutcome
 from app.scraper.robots import is_allowed
 
 logger = logging.getLogger(__name__)
-
 _TRANSIENT_CODES = {429, 500, 502, 503, 504}
 _TERMINAL_CODES  = {400, 401, 403, 404, 405, 410, 451}
 
@@ -38,11 +34,9 @@ def _is_transient(exc: Exception) -> bool:
         return exc.response.status_code in _TRANSIENT_CODES
     return False
 
-
 def _is_html(content_type: str) -> bool:
     ct = content_type.lower()
     return "text/html" in ct or "application/xhtml" in ct
-
 
 @retry(
     retry=retry_if_exception(_is_transient),
@@ -58,7 +52,6 @@ def _get(url: str, user_agent: str, timeout: int) -> httpx.Response:
     }
     with httpx.Client(follow_redirects=True, timeout=timeout) as client:
         return client.get(url, headers=headers)
-
 
 def fetch_page(
     url: str,
@@ -83,7 +76,7 @@ def fetch_page(
         return FetchOutcome(url=url, status="skipped:denylisted")
 
     if not is_allowed(url, domain, user_agent, timeout=5):
-        logger.info("robots.txt disallows %s", url)
+        logger.info(f"robots.txt disallows {url}")
         return FetchOutcome(url=url, status="skipped:robots")
 
     if rate_limit_delay > 0:
@@ -92,17 +85,17 @@ def fetch_page(
     try:
         resp = _get(url, user_agent, timeout)
     except httpx.TimeoutException:
-        logger.warning("Timeout fetching %s", url)
+        logger.warning(f"Timeout fetching {url}")
         return FetchOutcome(url=url, status="failed:timeout", error="Request timed out")
     except httpx.HTTPStatusError as exc:
         code = exc.response.status_code
-        logger.info("HTTP %d for %s", code, url)
+        logger.info(f"HTTP {code} for {url}")
         return FetchOutcome(url=url, status="failed:http_error", error=f"HTTP {code}")
     except httpx.RequestError as exc:
-        logger.warning("Request error for %s: %s", url, exc)
+        logger.warning(f"Request error for {url}: {exc}")
         return FetchOutcome(url=url, status="failed:http_error", error=str(exc)[:200])
     except Exception as exc:
-        logger.warning("Unexpected error for %s: %s", url, exc)
+        logger.warning(f"Unexpected error for {url}: {exc}")
         return FetchOutcome(url=url, status="failed:http_error", error=str(exc)[:200])
 
     ct = resp.headers.get("content-type", "")

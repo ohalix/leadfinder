@@ -1,11 +1,4 @@
-"""
-Email normalization.
-
-Intentionally simple: lowercase, strip, light syntax check.
-Full RFC 5322 compliance is not worth the false-negative rate for this use case.
-"""
 from __future__ import annotations
-
 import re
 from typing import Optional
 
@@ -49,23 +42,18 @@ def normalize_email(raw: str) -> Optional[str]:
         return None
 
     val = raw.strip()
-
     if val.lower().startswith("mailto:"):
         val = val[7:]
 
     # Strip query params that sometimes appear on mailto links
     val = val.split("?")[0].strip()
-
     val = val.lower()
-
     if not _EMAIL_RE.match(val):
         return None
 
     return val
 
-
 def is_junk_email(normalized: str) -> bool:
-    """Returns True for known placeholder / junk patterns after normalisation."""
     if not normalized:
         return True
     n = normalized.lower()

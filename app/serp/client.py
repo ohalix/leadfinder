@@ -1,47 +1,24 @@
-"""
-SerpAPI client.
-
-Parses three first-class result sources:
-  - organic_results
-  - answer_box
-  - ai_overview.references
-
-Designed behind a thin factory so swapping providers is a one-file change.
-"""
 from __future__ import annotations
-
 import logging
 from typing import List
 from urllib.parse import urlparse
-
 import httpx
-
 from app.models import SerpResult
 
 logger = logging.getLogger(__name__)
-
 SERPAPI_BASE = "https://serpapi.com/search.json"
 
 
 class SerpAPIError(Exception):
     pass
 
-
 class SerpAPIClient:
-    """
-    Wraps the SerpAPI Google Search endpoint.
-    One credit = one request, regardless of `num`.
-    Paginates automatically when max_results > 10.
-    """
-
     def __init__(self, api_key: str) -> None:
         if not api_key:
             raise SerpAPIError(
-                "SERP_API_KEY is not set.  Add it to your .env file."
+                f"SERP_API_KEY is not set.\nAdd it to your .env file."
             )
         self._key = api_key
-
-    # ── Public API ────────────────────────────────────────────────────────────
 
     def search(self, query: str, max_results: int = 10) -> List[SerpResult]:
         """
@@ -56,18 +33,17 @@ class SerpAPIClient:
         while len(collected) < max_results:
             want = min(page_size, max_results - len(collected))
             logger.debug(
-                "SerpAPI request — query=%r start=%d num=%d", query, start, want
+                f"SerpAPI request — query={query} start={start} num={want}"
             )
             try:
                 data = self._request(query, num=want, start=start)
             except SerpAPIError as exc:
-                logger.error("SerpAPI error: %s", exc)
+                logger.error(f"SerpAPI error: {exc}")
                 break
 
             page = self._parse(data)
             collected.extend(page)
 
-            # Stop if provider has no next page
             next_link = (
                 data.get("serpapi_pagination", {}).get("next")
                 or data.get("pagination", {}).get("next_link")
@@ -78,8 +54,6 @@ class SerpAPIClient:
             start += want
 
         return collected[:max_results]
-
-    # ── Private helpers ───────────────────────────────────────────────────────
 
     def _request(self, query: str, num: int, start: int) -> dict:
         params = {
@@ -104,7 +78,6 @@ class SerpAPIClient:
 
         data = resp.json()
 
-        # SerpAPI signals errors inside the JSON body too
         if "error" in data:
             raise SerpAPIError(f"SerpAPI returned error: {data['error']}")
 
@@ -112,9 +85,7 @@ class SerpAPIClient:
 
     def _parse(self, data: dict) -> List[SerpResult]:
         results: List[SerpResult] = []
-        rank = 1
 
-        # ── Organic results ───────────────────────────────────────────────────
         for item in data.get("organic_results", []):
             url = (item.get("link") or "").strip()
             if not url:
@@ -125,63 +96,81 @@ class SerpAPIClient:
                     title=item.get("title", ""),
                     snippet=item.get("snippet", ""),
                     domain=_domain(url),
-                    rank=rank,
+                    rank=item.get("position", ""),
                     source_type="organic",
                 )
             )
             rank += 1
 
-        # ── Answer box ────────────────────────────────────────────────────────
-        ab = data.get("answer_box") or {}
-        ab_url = (
-            ab.get("link")
-            or (ab.get("source") or {}).get("link")
-            or ""
-        ).strip()
-        if ab_url:
-            snippet = (
-                ab.get("answer")
-                or ab.get("snippet")
-                or ab.get("result")
-                or ""
-            )
-            results.append(
-                SerpResult(
-                    url=ab_url,
-                    title=ab.get("title", "Answer Box"),
-                    snippet=snippet,
-                    domain=_domain(ab_url),
-                    rank=0,
-                    source_type="answer_box",
+        if "ai_overview" in data:
+            for ref in (data.get("ai_overview") or {}).get("references") or []:
+                url = (ref.get("url") or "").strip()
+                if not url:
+                    continue
+                results.append(
+                    SerpResult(
+                        url=url,
+                        title=ref.get("title", ""),
+                        snippet=ref.get("snippet", ""),
+                        domain=_domain(url),
+                        rank=ref.get("index", ""),
+                        source_type="ai_overview",
+                    )
                 )
-            )
-
-        # ── AI Overview references ────────────────────────────────────────────
-        for ref in (data.get("ai_overview") or {}).get("references") or []:
-            url = (ref.get("url") or "").strip()
-            if not url:
-                continue
-            results.append(
-                SerpResult(
-                    url=url,
-                    title=ref.get("title", ""),
-                    snippet=ref.get("snippet", ""),
-                    domain=_domain(url),
-                    rank=0,
-                    source_type="ai_overview",
+                
+        if "places_sites" in data:
+            for place in data.get("places_sites"):
+                url = (place.get("link") or "").strip()
+                if not url:
+                    continue
+                results.append(
+                    SerpResult(
+                        url=url,
+                        title=place.get("title", ""),
+                        snippet=place.get("snippet", ""),
+                        domain=_domain(url),
+                        rank=place.get("position", ""),
+                        source_type="places_sites",
+                    )
                 )
-            )
-
+            
+        if "related_brands" in data:
+            for related in data.get("related_brands"):
+                rank = 1
+                url = (related.get("link") or "").strip()
+                if not url:
+                    continue    
+                results.append(
+                    SerpResult(
+                        url=url,
+                        title=related.get("title", ""),
+                        snippet=related.get("snippet", ""),
+                        domain=_domain(url),
+                        rank=rank,
+                        source_type="related_brands",
+                    )
+                )
+                rank =+ 1
+        
+        if "product_sites" in data:
+            for product_site in data.get("product_sites"):
+                url = (product_site.get("link") or "").strip()
+                if not url:
+                    continue    
+                results.append(
+                    SerpResult(
+                        url=url,
+                        title=product_site.get("title", ""),
+                        snippet=product_site.get("snippet", ""),
+                        domain=_domain(url),
+                        rank=product_site.get("position" or ""),
+                        source_type="product_sites",
+                    )
+                )
+        
         return results
 
-
-# ── Provider factory ──────────────────────────────────────────────────────────
-
 def get_serp_client(provider: str, api_key: str) -> SerpAPIClient:
-    """
-    Returns the appropriate SERP client for `provider`.
-    Currently only 'serpapi' is implemented; extend here for new providers.
-    """
     norm = provider.lower().replace("-", "_").replace(" ", "_")
     if norm in ("serpapi", "serp_api"):
         return SerpAPIClient(api_key)
@@ -190,11 +179,7 @@ def get_serp_client(provider: str, api_key: str) -> SerpAPIClient:
         "Supported values: 'serpapi'"
     )
 
-
-# ── Utilities ─────────────────────────────────────────────────────────────────
-
 def _domain(url: str) -> str:
-    """Extract bare hostname, strip www."""
     try:
         parsed = urlparse(url)
         host = parsed.netloc or parsed.path.split("/")[0]

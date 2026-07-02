@@ -1,34 +1,21 @@
-"""
-Repository layer.
-
-All SQL lives here — no SQL in routes, services, or models.
-Uses raw sqlite3 via the get_conn() context manager from db.py.
-"""
 from __future__ import annotations
-
 import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-
 from app.models import ExtractionHit, SerpResult
 from app.storage.db import get_conn
 
 logger = logging.getLogger(__name__)
 
-
-# ── Utilities ─────────────────────────────────────────────────────────────────
-
+# ── Utilities ──
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-
 
 def _uid() -> str:
     return str(uuid.uuid4())
 
-
-# ── Search run ────────────────────────────────────────────────────────────────
-
+# ── Search run ──
 def create_run(run_id: str, query: str, source_engine: str) -> None:
     with get_conn() as conn:
         conn.execute(
@@ -37,13 +24,7 @@ def create_run(run_id: str, query: str, source_engine: str) -> None:
             (run_id, query, source_engine, _now()),
         )
 
-
-def complete_run(
-    run_id: str,
-    total_results: int,
-    total_contacts: int,
-    status: str = "completed",
-) -> None:
+def complete_run(run_id: str, total_results: int, total_contacts: int, status: str = "completed") -> None:
     with get_conn() as conn:
         conn.execute(
             """UPDATE search_runs
@@ -52,14 +33,12 @@ def complete_run(
             (status, total_results, total_contacts, run_id),
         )
 
-
 def get_run(run_id: str) -> Optional[Dict[str, Any]]:
     with get_conn() as conn:
         row = conn.execute(
             "SELECT * FROM search_runs WHERE id=?", (run_id,)
         ).fetchone()
     return dict(row) if row else None
-
 
 def get_all_runs(limit: int = 50) -> List[Dict[str, Any]]:
     with get_conn() as conn:
@@ -69,15 +48,8 @@ def get_all_runs(limit: int = 50) -> List[Dict[str, Any]]:
         ).fetchall()
     return [dict(r) for r in rows]
 
-
-# ── SERP results ──────────────────────────────────────────────────────────────
-
-def insert_serp_result(
-    run_id: str,
-    result: SerpResult,
-    fetch_status: str,
-    fetch_error: Optional[str],
-) -> None:
+# ── SERP results ──
+def insert_serp_result(run_id: str, result: SerpResult, fetch_status: str, fetch_error: Optional[str]) -> None:
     with get_conn() as conn:
         conn.execute(
             """INSERT OR IGNORE INTO serp_results
@@ -91,15 +63,8 @@ def insert_serp_result(
             ),
         )
 
-
-# ── Leads ─────────────────────────────────────────────────────────────────────
-
-def upsert_lead(
-    hit: ExtractionHit,
-    run_id: str,
-    query: str,
-    source_engine: str,
-) -> str:
+# ── Leads ──
+def upsert_lead(hit: ExtractionHit, run_id: str, query: str, source_engine: str) -> str:
     """
     Insert a new lead or update seen_count + last_seen on duplicate.
     Always appends a lead_sources row (provenance trail).
@@ -152,14 +117,7 @@ def upsert_lead(
     return lead_id
 
 
-def query_leads(
-    query: Optional[str] = None,
-    domain: Optional[str] = None,
-    confidence: Optional[str] = None,
-    contact_type: Optional[str] = None,
-    limit: int = 200,
-    offset: int = 0,
-) -> List[Dict[str, Any]]:
+def query_leads(query: Optional[str] = None, domain: Optional[str] = None, confidence: Optional[str] = None, contact_type: Optional[str] = None, limit: int = 200, offset: int = 0) -> List[Dict[str, Any]]:
     """
     Filtered lead list with aggregated source URLs and queries.
     Ordered by seen_count DESC, last_seen DESC.
@@ -219,19 +177,17 @@ def query_leads(
     return results
 
 
-# ── Counts ────────────────────────────────────────────────────────────────────
+# ── Counts ──
 
 def count_leads() -> int:
     with get_conn() as conn:
         r = conn.execute("SELECT COUNT(*) AS c FROM leads").fetchone()
     return r["c"] if r else 0
 
-
 def count_runs() -> int:
     with get_conn() as conn:
         r = conn.execute("SELECT COUNT(*) AS c FROM search_runs").fetchone()
     return r["c"] if r else 0
-
 
 def leads_by_confidence() -> Dict[str, int]:
     with get_conn() as conn:
@@ -239,7 +195,6 @@ def leads_by_confidence() -> Dict[str, int]:
             "SELECT confidence, COUNT(*) AS c FROM leads GROUP BY confidence"
         ).fetchall()
     return {r["confidence"]: r["c"] for r in rows}
-
 
 def leads_by_type() -> Dict[str, int]:
     with get_conn() as conn:

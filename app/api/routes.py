@@ -1,19 +1,8 @@
-"""
-JSON API routes.
-
-All routes are intentionally thin:
-  parse request → call service or repository → serialize response.
-
-No business logic, no SQL, no HTTP fetching lives here.
-"""
 from __future__ import annotations
-
 import csv
 import io
 import logging
-
 from flask import Blueprint, Response, current_app, jsonify, request
-
 from app.services.search_service import run_search
 from app.storage import repository
 
@@ -21,15 +10,12 @@ api_bp = Blueprint("api", __name__)
 logger = logging.getLogger(__name__)
 
 
-# ── Health ────────────────────────────────────────────────────────────────────
-
+# ── Health ──
 @api_bp.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "service": "leadfinder"})
 
-
-# ── Search ────────────────────────────────────────────────────────────────────
-
+# ── Search ──
 @api_bp.route("/search", methods=["POST"])
 def search():
     body = request.get_json(force=True, silent=True) or {}
@@ -45,9 +31,7 @@ def search():
     status_code = 502 if "error" in result and not result.get("leads") else 200
     return jsonify(result), status_code
 
-
-# ── Leads ─────────────────────────────────────────────────────────────────────
-
+# ── Leads ──
 @api_bp.route("/leads", methods=["GET"])
 def leads():
     query        = request.args.get("query") or None
@@ -63,7 +47,6 @@ def leads():
         limit=limit, offset=offset,
     )
     return jsonify({"leads": data, "count": len(data)})
-
 
 @api_bp.route("/leads/export", methods=["GET"])
 def leads_export():
@@ -99,9 +82,7 @@ def leads_export():
         headers={"Content-Disposition": 'attachment; filename="leads_export.csv"'},
     )
 
-
-# ── Stats ─────────────────────────────────────────────────────────────────────
-
+# ── Stats ──
 @api_bp.route("/stats", methods=["GET"])
 def stats():
     return jsonify({
@@ -111,15 +92,12 @@ def stats():
         "by_type":       repository.leads_by_type(),
     })
 
-
-# ── Runs ──────────────────────────────────────────────────────────────────────
-
+# ── Runs ──
 @api_bp.route("/runs", methods=["GET"])
 def runs():
     limit = min(int(request.args.get("limit") or 50), 100)
     data  = repository.get_all_runs(limit=limit)
     return jsonify({"runs": data, "count": len(data)})
-
 
 @api_bp.route("/runs/<run_id>", methods=["GET"])
 def run_detail(run_id: str):

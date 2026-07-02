@@ -1,19 +1,8 @@
-"""
-Same-domain contact-page discovery.
-
-Scans anchor tags for links whose href path or visible text signals a
-contact page (Contact Us, Reach Us, About, Support, etc.).
-
-Returns at most one candidate URL — the highest-scored match.
-This is the only permitted crawl depth beyond the homepage in v1.
-"""
 from __future__ import annotations
-
 import logging
 import re
 from typing import List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
-
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
@@ -32,10 +21,6 @@ _CONTACT_SECONDARY_RE = re.compile(
 
 
 def find_contact_page(html: str, base_url: str) -> Optional[str]:
-    """
-    Returns the URL of the most likely same-domain contact page,
-    or None if nothing credible is found.
-    """
     if not html:
         return None
 
@@ -88,9 +73,8 @@ def find_contact_page(html: str, base_url: str) -> Optional[str]:
 
         candidates.sort(key=lambda t: t[0], reverse=True)
         best = candidates[0][1]
-        logger.debug("Contact page candidate: %s (score=%d)", best, candidates[0][0])
+        logger.debug(f"Contact page candidate: {best} (score={candidates[0][0]})")
         return best
-
     except Exception as exc:
-        logger.debug("Contact page discovery error on %s: %s", base_url, exc)
+        logger.debug(f"Contact page discovery error on {base_url}: {exc}")
         return None

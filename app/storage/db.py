@@ -1,17 +1,4 @@
-"""
-Database initialisation and connection management.
-
-Three-table schema:
-  search_runs   – one row per /api/search call
-  serp_results  – one row per URL returned by the SERP provider
-  leads         – one row per unique (contact_type, normalized_value) pair
-  lead_sources  – many rows per lead; records every run/URL that found it
-
-Uses WAL journal mode for safe concurrent reads during writes.
-No ORM – raw sqlite3 only.
-"""
 from __future__ import annotations
-
 import logging
 import os
 import sqlite3
@@ -19,26 +6,24 @@ from contextlib import contextmanager
 from typing import Generator
 
 logger = logging.getLogger(__name__)
-
-# Module-level path set by init_db() at app startup
 _db_path: str = ""
 
 
 def init_db(app) -> None:
-    """Called once from the app factory.  Creates tables if they don't exist."""
     global _db_path
     _db_path = app.config["DATABASE_PATH"]
 
-    # Ensure the data directory exists
     data_dir = os.path.dirname(_db_path)
-    if data_dir:
-        os.makedirs(data_dir, exist_ok=True)
+    try:
+        if data_dir:
+            os.makedirs(data_dir, exist_ok=True)
 
-    with _connect() as conn:
-        _create_schema(conn)
+        with _connect() as conn:
+            _create_schema(conn)
 
-    logger.info("Database ready: %s", _db_path)
-
+        logger.info(f"Database ready: {_db_path}")
+    except Exception as e:
+        logger.warning(f"Error creating Directory/Database: {e}")
 
 @contextmanager
 def get_conn() -> Generator[sqlite3.Connection, None, None]:
@@ -56,9 +41,7 @@ def get_conn() -> Generator[sqlite3.Connection, None, None]:
     finally:
         conn.close()
 
-
-# ── Private ───────────────────────────────────────────────────────────────────
-
+# ── Private ──
 def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(
         _db_path,
@@ -69,7 +52,6 @@ def _connect() -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA synchronous=NORMAL")  # safe with WAL, faster than FULL
     return conn
-
 
 def _create_schema(conn: sqlite3.Connection) -> None:
     conn.executescript("""

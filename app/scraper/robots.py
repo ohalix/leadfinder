@@ -8,11 +8,9 @@ The robots rules for each domain are cached in-memory for the lifetime
 of the process — one fetch per domain per run, not one per URL.
 """
 from __future__ import annotations
-
 import logging
 import time
 from typing import Dict, Optional, Tuple
-
 import httpx
 from protego import Protego
 
@@ -33,26 +31,21 @@ def is_allowed(url: str, domain: str, user_agent: str, timeout: int = 5) -> bool
         _cache[domain] = _load(domain, user_agent, timeout)
 
     rp, delay = _cache[domain]
-
     if rp is None:
         return True  # no robots.txt or parse failure → assume allowed
 
     allowed: bool = rp.can_fetch(url, user_agent)
-
     if allowed and delay > 0:
-        logger.debug("robots crawl-delay %.1fs for %s", delay, domain)
+        logger.debug(f"robots crawl-delay {delay:.1f}s for {domain}")
         time.sleep(delay)
 
     return allowed
-
 
 def clear_cache() -> None:
     """Reset the per-process cache (useful in tests)."""
     _cache.clear()
 
-
-# ── Private ───────────────────────────────────────────────────────────────────
-
+# ── Private ──
 def _load(domain: str, user_agent: str, timeout: int) -> Tuple[Optional[Protego], float]:
     raw = _fetch_robots_txt(domain, user_agent, timeout)
     if raw is None:
@@ -61,17 +54,13 @@ def _load(domain: str, user_agent: str, timeout: int) -> Tuple[Optional[Protego]
     try:
         rp = Protego.parse(raw)
         delay = float(rp.crawl_delay(user_agent) or 0.0)
-        logger.debug("robots.txt loaded for %s (crawl-delay=%.1fs)", domain, delay)
+        logger.debug(f"robots.txt loaded for {domain} (crawl-delay={delay:.1f}s)")
         return rp, delay
     except Exception as exc:
-        logger.debug("Failed to parse robots.txt for %s: %s", domain, exc)
+        logger.debug(f"Failed to parse robots.txt for {domain}: {exc}")
         return None, 0.0
 
-
-def _fetch_robots_txt(
-    domain: str, user_agent: str, timeout: int
-) -> Optional[str]:
-    """Try HTTPS first, fall back to HTTP."""
+def _fetch_robots_txt(domain: str, user_agent: str, timeout: int) -> Optional[str]:
     for scheme in ("https", "http"):
         url = f"{scheme}://{domain}/robots.txt"
         try:
@@ -85,5 +74,5 @@ def _fetch_robots_txt(
                 return resp.text
         except Exception:
             pass
-    logger.debug("Could not fetch robots.txt for %s — assuming allowed", domain)
+    logger.debug(f"Could not fetch robots.txt for {domain} — assuming allowed")
     return None

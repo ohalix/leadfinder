@@ -11,7 +11,6 @@ Degrades gracefully if the library is somehow missing (returns raw string
 after basic sanity checks).
 """
 from __future__ import annotations
-
 import logging
 import re
 from typing import Optional
@@ -43,7 +42,6 @@ def normalize_phone(raw: str, default_region: str = "US") -> Optional[str]:
         return None
 
     val = raw.strip()
-
     if not _LIB_OK:
         # Minimal fallback: at least 7 digits present
         return val if len(_DIGITS_RE.findall(val)) >= 7 else None
@@ -53,7 +51,7 @@ def normalize_phone(raw: str, default_region: str = "US") -> Optional[str]:
     except NumberParseException:
         return None
     except Exception as exc:
-        logger.debug("Unexpected phone parse error for %r: %s", val, exc)
+        logger.debug(f"Unexpected phone parse error for {val!r}: {exc}")
         return None
 
     if not phonenumbers.is_valid_number(parsed):
@@ -63,10 +61,6 @@ def normalize_phone(raw: str, default_region: str = "US") -> Optional[str]:
 
 
 def is_junk_phone(raw: str) -> bool:
-    """
-    Quick pre-filter before handing off to the phonenumbers library.
-    Catches obvious non-phones that regex may have matched (dates, ISBNs, etc.)
-    """
     if not raw:
         return True
 

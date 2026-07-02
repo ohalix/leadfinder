@@ -29,11 +29,9 @@ def index():
         by_type=by_type,
     )
 
-
 @views_bp.route("/search")
 def search():
     return render_template("search.html")
-
 
 @views_bp.route("/leads")
 def leads():
@@ -62,7 +60,6 @@ def leads():
         },
         total=len(leads_data),
     )
-
 
 @views_bp.route("/leads/export")
 def leads_export():

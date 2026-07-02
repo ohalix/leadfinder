@@ -18,13 +18,11 @@ NOTE: `config` is Flask's app.config dict-like object — always use
       config.get("KEY", default) or config["KEY"], never config.KEY.
 """
 from __future__ import annotations
-
 import logging
 import time
 import uuid
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
-
 from app.models import ExtractionHit, FetchOutcome, SerpResult
 from app.scraper.fetcher import fetch_page
 from app.scraper.discovery import find_contact_page
@@ -39,17 +37,7 @@ from app.storage import repository
 logger = logging.getLogger(__name__)
 
 
-def run_search(
-    query: str,
-    config: Any,
-    max_results: Optional[int] = None,
-) -> Dict[str, Any]:
-    """
-    Main entry point.  Returns a JSON-serialisable dict:
-      {run_id, query, source_engine, leads: [...], summary: {...}}
-
-    `config` is current_app.config — a Flask dict.  Use config.get() everywhere.
-    """
+def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> Dict[str, Any]:
     run_id        = str(uuid.uuid4())
     max_results   = max_results or config.get("SERP_MAX_RESULTS", 10)
     source_engine = config.get("SERP_PROVIDER", "serpapi")
@@ -63,18 +51,18 @@ def run_search(
     phone_region  = config.get("DEFAULT_PHONE_REGION", "US")
 
     repository.create_run(run_id, query, source_engine)
-    logger.info("[%s] Search started: %r  max=%d", run_id, query, max_results)
+    logger.info(f"[{run_id}] Search started: {query!r}  max={max_results:,d}")
 
     # ── 1. SERP ───────────────────────────────────────────────────────────────
     try:
         client = get_serp_client(source_engine, api_key)
         serp_results: List[SerpResult] = client.search(query, max_results=max_results)
     except (SerpAPIError, ValueError) as exc:
-        logger.error("[%s] SERP failed: %s", run_id, exc)
+        logger.error(f"[{run_id}] SERP failed: {exc}")
         repository.complete_run(run_id, 0, 0, "failed")
         return _error_response(run_id, str(exc))
 
-    logger.info("[%s] SERP returned %d result(s)", run_id, len(serp_results))
+    logger.info(f"[{run_id}] SERP returned {len(serp_results):,d} result(s)")
 
     # ── 2. Denylist filter ────────────────────────────────────────────────────
     allowed: List[SerpResult] = []
@@ -87,8 +75,7 @@ def run_search(
             allowed.append(r)
 
     logger.info(
-        "[%s] After denylist: %d allowed, %d skipped",
-        run_id, len(allowed), skipped_deny,
+        f"[{run_id}] After denylist: {len(allowed):,d} allowed, {skipped_deny:,d} skipped"
     )
 
     # ── 3–6. Fetch / extract loop ─────────────────────────────────────────────
@@ -128,7 +115,7 @@ def run_search(
 
         # Playwright fallback — only when static fetch returns a JS shell
         if is_js_shell(html) and pw_enabled:
-            logger.info("[%s] JS shell detected → Playwright: %s", run_id, url)
+            logger.info(f"[{run_id}] JS shell detected → Playwright: {url}")
             rendered = render_page(url, timeout_ms=pw_timeout)
             if rendered:
                 html = rendered
@@ -147,7 +134,7 @@ def run_search(
             contact_url = find_contact_page(html, url)
             if contact_url and contact_url not in seen_urls:
                 seen_urls.add(contact_url)
-                logger.debug("[%s] Contact-page hop → %s", run_id, contact_url)
+                logger.debug(f"[{run_id}] Contact-page hop → {contact_url}")
                 time.sleep(rate_delay)
                 c_outcome = fetch_page(
                     url=contact_url,
@@ -196,11 +183,11 @@ def run_search(
             stored += 1
         except Exception as exc:
             logger.warning(
-                "[%s] Storage error for %r: %s", run_id, hit.normalized_value, exc
+                f"[{run_id}] Storage error for {hit.normalized_value!r}: {exc}"
             )
 
     repository.complete_run(run_id, len(serp_results), stored)
-    logger.info("[%s] Done — %d contact(s) stored", run_id, stored)
+    logger.info(f"[{run_id}] Done — {stored:,d} contact(s) stored")
 
     # ── 10. Response ──────────────────────────────────────────────────────────
     leads = repository.query_leads(query=query, limit=500)
@@ -226,15 +213,12 @@ def run_search(
         },
     }
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
+# ── Helpers ──
 def _domain(url: str) -> str:
     try:
         return urlparse(url).netloc.lower().replace("www.", "")
     except Exception:
         return ""
-
 
 def _is_denylisted(domain: str, denylist) -> bool:
     d = domain.lower()
@@ -242,7 +226,6 @@ def _is_denylisted(domain: str, denylist) -> bool:
         if d == deny or d.endswith("." + deny):
             return True
     return False
-
 
 def _error_response(run_id: str, message: str) -> Dict[str, Any]:
     return {

@@ -1,15 +1,8 @@
-"""
-Core data models.  All layers import from here; nothing else defines types.
-"""
 from __future__ import annotations
-
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
-
-
-# ── SERP layer ────────────────────────────────────────────────────────────────
 
 @dataclass
 class SerpResult:
@@ -20,9 +13,6 @@ class SerpResult:
     rank: int
     # organic | answer_box | ai_overview
     source_type: str = "organic"
-
-
-# ── Scraper layer ─────────────────────────────────────────────────────────────
 
 @dataclass
 class FetchOutcome:
@@ -35,8 +25,6 @@ class FetchOutcome:
     used_playwright: bool = False
 
 
-# ── Extraction layer ──────────────────────────────────────────────────────────
-
 @dataclass
 class ExtractionHit:
     contact_type: str          # email | phone
@@ -47,9 +35,6 @@ class ExtractionHit:
     # high | medium | low  (re-scored by confidence.py)
     confidence: str
     source_url: str
-
-
-# ── Storage / response layer ──────────────────────────────────────────────────
 
 @dataclass
 class Lead:
@@ -65,7 +50,6 @@ class Lead:
     seen_count: int = 1
     first_seen: datetime = field(default_factory=datetime.utcnow)
     last_seen: datetime = field(default_factory=datetime.utcnow)
-
 
 @dataclass
 class RunSummary:
