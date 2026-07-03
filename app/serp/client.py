@@ -32,11 +32,11 @@ class SerpAPIClient:
 
         while len(collected) < max_results:
             want = min(page_size, max_results - len(collected))
-            logger.debug(
-                f"SerpAPI request — query={query} start={start} num={want}"
+            logger.info(
+                f"SerpAPI request — query={query} start={start}"
             )
             try:
-                data = self._request(query, num=want, start=start)
+                data = self._request(query, start=start)
             except SerpAPIError as exc:
                 logger.error(f"SerpAPI error: {exc}")
                 break
@@ -48,19 +48,19 @@ class SerpAPIClient:
                 data.get("serpapi_pagination", {}).get("next")
                 or data.get("pagination", {}).get("next_link")
             )
+            logger.info(f"page length= {len(page)}, want= {want}")
             if not next_link or len(page) < want:
-                break
+                 break
 
             start += want
 
         return collected[:max_results]
 
-    def _request(self, query: str, num: int, start: int) -> dict:
+    def _request(self, query: str, start: int) -> dict:
         params = {
             "q": query,
             "api_key": self._key,
             "engine": "google",
-            "num": num,
             "start": start,
             "hl": "en",
             "gl": "us",
@@ -100,9 +100,42 @@ class SerpAPIClient:
                     source_type="organic",
                 )
             )
-            rank += 1
 
         if "ai_overview" in data:
+            for block in (data.get("ai_overview") or {}).get("text_blocks") or []:
+                if block.get("type") == "paragraph" and "snippet_links" in block:
+                    for ref in block.get("snippet_links"):
+                        url = (ref.get("link") or "").strip()
+                        if not url:
+                            continue
+                        results.append(
+                            SerpResult(
+                                url= url,
+                                title= ref.get("title", ""),
+                                snippet= ref.get("snippet", ""),
+                                domain= _domain(url),
+                                rank= ref.get("index", ""),
+                                source_type= "ai_overview"
+                            )
+                        )
+                elif block.get("type") == "list":
+                    for list_item in block.get("list"):
+                        if "snippet_links" in list_item:
+                            for ref in list_item.get("snippet_links"):
+                                url = (ref.get("link") or "").strip()
+                                if not url:
+                                    continue
+                                results.append(
+                                    SerpResult(
+                                        url= url,
+                                        title= list_item.get("title", ""),
+                                        snippet= ref.get("text", ""),
+                                        domain= _domain(url),
+                                        rank= ref.get("index", ""),
+                                        source_type= "ai_overview"
+                                    )
+                                )
+                
             for ref in (data.get("ai_overview") or {}).get("references") or []:
                 url = (ref.get("url") or "").strip()
                 if not url:
@@ -186,3 +219,7 @@ def _domain(url: str) -> str:
         return host.lower().replace("www.", "")
     except Exception:
         return ""
+
+
+# local_pack
+# 
