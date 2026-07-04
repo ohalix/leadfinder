@@ -53,7 +53,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> D
     repository.create_run(run_id, query, source_engine)
     logger.info(f"[{run_id}] Search started: {query!r}  max={max_results:,d}")
 
-    # ── 1. SERP ───────────────────────────────────────────────────────────────
+    # ── 1. SERP ──
     try:
         client = get_serp_client(source_engine, api_key)
         serp_results: List[SerpResult] = client.search(query, max_results=max_results)
@@ -64,7 +64,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> D
 
     logger.info(f"[{run_id}] SERP returned {len(serp_results):,d} result(s)")
 
-    # ── 2. Denylist filter ────────────────────────────────────────────────────
+    # ── 2. Denylist filter ──
     allowed: List[SerpResult] = []
     skipped_deny = 0
     for r in serp_results:
@@ -78,7 +78,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> D
         f"[{run_id}] After denylist: {len(allowed):,d} allowed, {skipped_deny:,d} skipped"
     )
 
-    # ── 3–6. Fetch / extract loop ─────────────────────────────────────────────
+    # ── 3–6. Fetch / extract loop ──
     all_hits: List[ExtractionHit] = []
     outcomes: List[FetchOutcome]  = []
     seen_urls: set                = set()
@@ -149,8 +149,35 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> D
                     page_hits.extend(extra)
 
         all_hits.extend(page_hits)
+        
+    # ── 3b. Local Pack direct contacts (Task 3) ──
+    # Calls the Google Local Pack API endpoint separately and injects phone
+    # numbers directly into all_hits, bypassing the scraping step.
+    # Failures are logged and skipped; they never abort the rest of the pipeline.
+    try:
+        local_places = client.search_local_pack(query)
+        injected = 0
+        for place in local_places:
+            phone   = (place.get("phone") or "").strip()
+            website = (place.get("website") or "").strip()
+            if not phone:
+                continue
+        
+            all_hits.append(ExtractionHit(
+                contact_type="phone",
+                raw_value=phone,
+                normalized_value=phone,
+                method="local_pack",
+                confidence="high",
+                source_url=website or place.get("title", ""),
+            ))
+            injected += 1
+        if injected:
+            logger.info(f"[{run_id}] Local pack injected {injected} phone(s) directly")
+    except Exception as exc:
+        logger.warning(f"[{run_id}] Local pack direct search failed (non-fatal): {exc}")
 
-    # ── 7. Normalize + junk filter ────────────────────────────────────────────
+    # ── 7. Normalize + junk filter ──
     clean: List[ExtractionHit] = []
     for hit in all_hits:
         if hit.contact_type == "email":
@@ -172,10 +199,10 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> D
 
         clean.append(hit)
 
-    # ── 8. Dedup across pages ─────────────────────────────────────────────────
+    # ── 8. Dedup across pages ──
     deduped = dedup_hits(clean)
 
-    # ── 9. Store ──────────────────────────────────────────────────────────────
+    # ── 9. Store ──
     stored = 0
     for hit in deduped:
         try:
@@ -189,7 +216,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> D
     repository.complete_run(run_id, len(serp_results), stored)
     logger.info(f"[{run_id}] Done — {stored:,d} contact(s) stored")
 
-    # ── 10. Response ──────────────────────────────────────────────────────────
+    # ── 10. Response ──
     leads = repository.query_leads(query=query, limit=500)
 
     outcome_counts: Dict[str, int] = {}
