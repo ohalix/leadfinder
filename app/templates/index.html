@@ -102,7 +102,7 @@
     <tbody>
       {% for run in recent_runs %}
       <tr>
-        <td class="mono">{{ run.query }}</td>
+        <td class="mono" onclick="window.location='{{ url_for('views.search') }}'">{{ run.query }}</td>
         <td><span class="tag">{{ run.source_engine }}</span></td>
         <td class="mono accent">{{ run.total_contacts_found }}</td>
         <td class="mono muted">{{ run.total_result_count }}</td>

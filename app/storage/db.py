@@ -63,7 +63,9 @@ def _create_schema(conn: sqlite3.Connection) -> None:
         created_at           TEXT    NOT NULL DEFAULT (datetime('now')),
         status               TEXT    NOT NULL DEFAULT 'running',
         total_result_count   INTEGER NOT NULL DEFAULT 0,
-        total_contacts_found INTEGER NOT NULL DEFAULT 0
+        total_contacts_found INTEGER NOT NULL DEFAULT 0,
+        serp_max_results     INTEGER NOT NULL DEFAULT 10,
+        lp_max_results       INTEGER NOT NULL DEFAULT 10
     );
 
     -- ── serp_results ──────────────────────────────────────────────────────

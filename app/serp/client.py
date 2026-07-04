@@ -112,8 +112,9 @@ class SerpAPIClient:
             places = local.get("places", [])
         results = self._parse_local_places(places)
         results = results[:max_results]
+        result_count = len(results)
         logger.info(f"SerpAPI local pack: {len(results)} place(s) returned")
-        return results
+        return results, result_count
 
     def _request(self, query: str, start: int) -> dict:
         params = {
@@ -321,7 +322,3 @@ def _domain(url: str) -> str:
         return host.lower().replace("www.", "")
     except Exception:
         return ""
-
-
-# local_pack
-# 

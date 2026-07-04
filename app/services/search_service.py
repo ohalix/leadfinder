@@ -157,7 +157,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
     lp_phones_injected = 0
     lp_pages_scraped   = 0
     try:
-        local_places = client.search_local_pack(query, max_results=local_pack_max_results)
+        local_places, lp_result_count = client.search_local_pack(query, max_results=local_pack_max_results)
         for place in local_places:
             phone   = (place.get("phone") or "").strip()
             website = (place.get("website") or "").strip()
@@ -262,7 +262,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
                 f"[{run_id}] Storage error for {hit.normalized_value!r}: {exc}"
             )
 
-    repository.complete_run(run_id, len(serp_results), stored)
+    repository.complete_run(run_id, (len(serp_results) + lp_result_count), stored)
     logger.info(f"[{run_id}] Done — {stored:,d} contact(s) stored")
 
     # ── 10. Response ──
