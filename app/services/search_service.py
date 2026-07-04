@@ -37,7 +37,7 @@ from app.storage import repository
 logger = logging.getLogger(__name__)
 
 
-def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> Dict[str, Any]:
+def run_search(query: str, config: Any, max_results: Optional[int] = None, local_pack_max_results: int = 10) -> Dict[str, Any]:
     run_id        = str(uuid.uuid4())
     max_results   = max_results or config.get("SERP_MAX_RESULTS", 10)
     source_engine = config.get("SERP_PROVIDER", "serpapi")
@@ -154,26 +154,77 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> D
     # Calls the Google Local Pack API endpoint separately and injects phone
     # numbers directly into all_hits, bypassing the scraping step.
     # Failures are logged and skipped; they never abort the rest of the pipeline.
+    lp_phones_injected = 0
+    lp_pages_scraped   = 0
     try:
-        local_places = client.search_local_pack(query)
-        injected = 0
+        local_places = client.search_local_pack(query, max_results=local_pack_max_results)
         for place in local_places:
             phone   = (place.get("phone") or "").strip()
             website = (place.get("website") or "").strip()
-            if not phone:
+            
+            if phone:
+                all_hits.append(ExtractionHit(
+                    contact_type="phone",
+                    raw_value=phone,
+                    normalized_value=phone,
+                    method="local_pack",
+                    confidence="high",
+                    source_url=website or place.get("title", ""),
+                ))
+                lp_phones_injected += 1
+            
+            if not website or website in seen_urls:
                 continue
-        
-            all_hits.append(ExtractionHit(
-                contact_type="phone",
-                raw_value=phone,
-                normalized_value=phone,
-                method="local_pack",
-                confidence="high",
-                source_url=website or place.get("title", ""),
-            ))
-            injected += 1
-        if injected:
-            logger.info(f"[{run_id}] Local pack injected {injected} phone(s) directly")
+            
+            seen_urls.add(website)
+            dom = _domain(website)
+            if _is_denylisted(dom, denylist):
+                continue
+
+            time.sleep(rate_delay)
+            lp_outcome = fetch_page(
+                url=website,
+                domain=dom,
+                user_agent=user_agent,
+                timeout=timeout,
+                rate_limit_delay=0,
+                denylisted=False,
+            )
+
+            if lp_outcome.status != "ok" or not lp_outcome.html:
+                continue
+
+            lp_html = lp_outcome.html
+            if is_js_shell(lp_html) and pw_enabled:
+                rendered = render_page(website, timeout_ms=pw_timeout)
+                if rendered:
+                    lp_html = rendered
+
+            lp_hits = extract_contacts(lp_html, website)
+            if len(lp_hits) < 2:
+                contact_url = find_contact_page(lp_html, website)
+                if contact_url and contact_url not in seen_urls:
+                    seen_urls.add(contact_url)
+                    time.sleep(rate_delay)
+                    c_outcome = fetch_page(
+                        url=contact_url,
+                        domain=dom,
+                        user_agent=user_agent,
+                        timeout=timeout,
+                        rate_limit_delay=0,
+                        denylisted=False,
+                    )
+                    if c_outcome.status == "ok" and c_outcome.html:
+                        lp_hits.extend(extract_contacts(c_outcome.html, contact_url))
+
+            all_hits.extend(lp_hits)
+            lp_pages_scraped += 1
+
+        if lp_phones_injected or lp_pages_scraped:
+            logger.info(
+                f"[{run_id}] Local pack: {lp_phones_injected} phone(s) injected, "
+                f"{lp_pages_scraped} website(s) scraped"
+            )   
     except Exception as exc:
         logger.warning(f"[{run_id}] Local pack direct search failed (non-fatal): {exc}")
 
@@ -185,7 +236,6 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> D
             if norm is None or is_junk_email(norm):
                 continue
             hit.normalized_value = norm
-
         elif hit.contact_type == "phone":
             if is_junk_phone(hit.raw_value):
                 continue
@@ -193,7 +243,6 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> D
             if norm is None:
                 continue
             hit.normalized_value = norm
-
         else:
             continue  # unknown contact type
 
@@ -237,6 +286,8 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None,) -> D
             "skipped_denylisted": skipped_deny,
             "contacts_found":     stored,
             "outcome_breakdown":  outcome_counts,
+            "local_pack_phones":   lp_phones_injected,
+            "local_pack_pages_scraped": lp_pages_scraped,
         },
     }
 

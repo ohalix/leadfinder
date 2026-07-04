@@ -61,7 +61,7 @@ class SerpAPIClient:
 
         return collected[:max_results]
 
-    def search_local_pack(self, query: str, location: str = "") -> List[dict]:
+    def search_local_pack(self, query: str, location: str = "", max_results: int = 10) -> List[dict]:
         """
         Calls the SerpAPI Google Local Pack endpoint (engine=google_local) and
         returns a list of structured business dicts ready for direct injection
@@ -111,6 +111,7 @@ class SerpAPIClient:
         else:
             places = local.get("places", [])
         results = self._parse_local_places(places)
+        results = results[:max_results]
         logger.info(f"SerpAPI local pack: {len(results)} place(s) returned")
         return results
 
@@ -135,7 +136,6 @@ class SerpAPIClient:
             raise SerpAPIError(f"SerpAPI request failed: {exc}") from exc
 
         data = resp.json()
-
         if "error" in data:
             raise SerpAPIError(f"SerpAPI returned error: {data['error']}")
 

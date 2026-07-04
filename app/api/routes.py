@@ -20,14 +20,25 @@ def health():
 def search():
     body = request.get_json(force=True, silent=True) or {}
     query = (body.get("query") or "").strip()
-    max_results = int(body.get("max_results") or current_app.config.get("SERP_MAX_RESULTS", 10))
+    raw_max = body.get("max_results")
+    try:
+        max_results = int(raw_max) if raw_max is not None else current_app.config.get("SERP_MAX_RESULTS", 10)
+    except (ValueError, TypeError):
+        max_results = 10
+    max_results = max(10, min(100, (max_results // 10) * 10)) if max_results >= 10 else 10
+
+    # ── local_pack_max_results: 1–20; default 10 ──
+    raw_lp = body.get("local_pack_max_results")
+    try:
+        local_pack_max_results = int(raw_lp) if raw_lp is not None else 10
+    except (ValueError, TypeError):
+        local_pack_max_results = 10
+    local_pack_max_results = max(1, min(20, local_pack_max_results))
 
     if not query:
         return jsonify({"error": "query is required"}), 400
-    if not (1 <= max_results <= 100):
-        return jsonify({"error": "max_results must be between 1 and 100"}), 400
 
-    result = run_search(query, current_app.config, max_results=max_results)
+    result = run_search(query, current_app.config, max_results=max_results, local_pack_max_results=local_pack_max_results)
     status_code = 502 if "error" in result and not result.get("leads") else 200
     return jsonify(result), status_code
 

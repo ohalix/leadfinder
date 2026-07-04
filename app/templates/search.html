@@ -28,13 +28,40 @@
     </div>
     <div class="search-options">
       <label class="option-label">
-        Max results
+        SERP results
         <select id="max-results" class="select-sm">
-          <option value="5">5</option>
           <option value="10" selected>10</option>
           <option value="20">20</option>
           <option value="30">30</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
         </select>
+      </label>
+      <label class="option-label">
+        or custom (×10, max 100)
+        <input
+          type="number"
+          id="max-results-custom"
+          class="select-sm"
+          placeholder="40"
+          min="10"
+          max="100"
+          step="10"
+          style="width:82px"
+        />
+      </label>
+      <label class="option-label">
+        Local pack limit
+        <input
+          type="number"
+          id="local-pack-max"
+          class="select-sm"
+          value="10"
+          min="1"
+          max="20"
+          step="1"
+          style="width:64px"
+        />
       </label>
       <button type="submit" id="search-btn" class="btn btn-primary" onclick="runSearch()">
         Search
@@ -78,9 +105,31 @@
 
 {% block scripts %}
 <script>
+// Snap a number to the nearest multiple of step, clamped to [min, max].
+function snapToMultiple(val, step, min, max) {
+  const snapped = Math.round(val / step) * step;
+  return Math.min(max, Math.max(min, snapped));
+}
+
 async function runSearch() {
   const query = document.getElementById('query-input').value.trim();
-  const maxResults = parseInt(document.getElementById('max-results').value, 10);
+
+  // Custom input overrides dropdown when it has a valid value
+  const customRaw = document.getElementById('max-results-custom').value.trim();
+  let maxResults;
+  if (customRaw !== '') {
+    const parsed = parseInt(customRaw, 10);
+    if (isNaN(parsed) || parsed < 10) {
+      showError('Custom result count must be at least 10.');
+      return;
+    }
+    maxResults = snapToMultiple(parsed, 10, 10, 100);
+  } else {
+    maxResults = parseInt(document.getElementById('max-results').value, 10);
+  }
+
+  const lpRaw = parseInt(document.getElementById('local-pack-max').value, 10);
+  const localPackMax = isNaN(lpRaw) ? 10 : Math.min(20, Math.max(1, lpRaw));
 
   if (!query) {
     document.getElementById('query-input').focus();
@@ -100,7 +149,7 @@ async function runSearch() {
     const resp = await fetch('/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, max_results: maxResults })
+      body: JSON.stringify({ query, max_results: maxResults, local_pack_max_results: localPackMax })
     });
 
     const data = await resp.json();
@@ -138,6 +187,8 @@ function renderResults(data) {
     <div class="summary-item"><div class="summary-val mono muted">${s.pages_skipped ?? '—'}</div><div class="summary-key">Skipped</div></div>
     <div class="summary-item"><div class="summary-val mono warn">${s.pages_failed ?? '—'}</div><div class="summary-key">Failed</div></div>
     <div class="summary-item"><div class="summary-val mono muted">${s.skipped_denylisted ?? '—'}</div><div class="summary-key">Denylisted</div></div>
+    <div class="summary-item"><div class="summary-val mono accent">${s.local_pack_phones ?? '—'}</div><div class="summary-key">Local pack phones</div></div>
+    <div class="summary-item"><div class="summary-val mono">${s.local_pack_pages_scraped ?? '—'}</div><div class="summary-key">Local pack scraped</div></div>
   `;
 
   // Lead count
