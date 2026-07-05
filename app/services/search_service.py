@@ -168,7 +168,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
                     normalized_value=phone,
                     method="local_pack",
                     confidence="high",
-                    source_url=website if website is not None else place.get("title", ""),
+                    source_url=website if website is not False else place.get("title", ""),
                 ))
                 lp_phones_injected += 1
             
