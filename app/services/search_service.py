@@ -60,7 +60,9 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
     except (SerpAPIError, ValueError) as exc:
         logger.error(f"[{run_id}] SERP failed: {exc}")
         repository.complete_run(run_id, 0, 0, "failed")
-        return _error_response(run_id, str(exc))
+        if "[Errno 11001]" in str(exc):
+            error = "Network/Internet Connection Error"
+        return _error_response(run_id, error)
 
     logger.info(f"[{run_id}] SERP returned {len(serp_results):,d} result(s)")
 

@@ -39,7 +39,7 @@ class SerpAPIClient:
                 data = self._request(query, start=start)
             except SerpAPIError as exc:
                 logger.error(f"SerpAPI error: {exc}")
-                break
+                raise SerpAPIError(f"{exc}") from exc
 
             page = self._parse(data)
             if not page:
