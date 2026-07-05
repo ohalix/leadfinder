@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Leads — LeadFinder{% endblock %}
+{% block title %}Leads | LeadFinder{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -37,8 +37,8 @@
   </select>
   <select name="contact_type" class="filter-select">
     <option value="">All types</option>
-    <option value="email" {% if filters.contact_type == 'email' %}selected{% endif %}>Email</option>
-    <option value="phone" {% if filters.contact_type == 'phone' %}selected{% endif %}>Phone</option>
+    <option value="email" {% if filters.contact_type == 'email' %}selected{% endif %}>E-mails</option>
+    <option value="phone" {% if filters.contact_type == 'phone' %}selected{% endif %}>Phones</option>
   </select>
   <button type="submit" class="btn btn-ghost btn-sm">Apply</button>
   <a href="{{ url_for('views.leads') }}" class="btn btn-ghost btn-sm">Clear</a>

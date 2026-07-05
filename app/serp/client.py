@@ -66,12 +66,6 @@ class SerpAPIClient:
         Calls the SerpAPI Google Local Pack endpoint (engine=google_local) and
         returns a list of structured business dicts ready for direct injection
         into the lead pipeline.
-
-        Returns an empty list on any failure so the caller can continue normally.
-
-        Each returned dict includes (when available):
-            title, phone, website, domain, address, type, rating, reviews,
-            description, hours, years_in_business, position
         """
         params = {
             "q": query,
