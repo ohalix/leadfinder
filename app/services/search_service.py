@@ -152,10 +152,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
 
         all_hits.extend(page_hits)
         
-    # ── 3b. Local Pack direct contacts (Task 3) ──
-    # Calls the Google Local Pack API endpoint separately and injects phone
-    # numbers directly into all_hits, bypassing the scraping step.
-    # Failures are logged and skipped; they never abort the rest of the pipeline.
+    # ── 3b. Local Pack Call ──
     lp_phones_injected = 0
     lp_pages_scraped   = 0
     try:
@@ -171,7 +168,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
                     normalized_value=phone,
                     method="local_pack",
                     confidence="high",
-                    source_url=website or place.get("title", ""),
+                    source_url=website if website is not None else place.get("title", ""),
                 ))
                 lp_phones_injected += 1
             
