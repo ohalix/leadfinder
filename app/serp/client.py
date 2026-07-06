@@ -61,54 +61,89 @@ class SerpAPIClient:
 
         return collected[:max_results]
 
-    def search_local_pack(self, query: str, location: str = "", max_results: int = 10) -> List[dict]:
+    def search_local_pack(self, query: str, location: str = "", max_results: int = 10) -> tuple:
         """
-        Calls the SerpAPI Google Local Pack endpoint (engine=google_local) and
-        returns a list of structured business dicts ready for direct injection
-        into the lead pipeline.
+        Calls the SerpAPI Google Local Pack endpoint with pagination.
+
+        Page size: 20 results per page (provider default).
+        start increments by 20 per page.
+        Hard cap: 60 results maximum regardless of max_results.
+        Mirrors the pagination logic of search() but with local pack page semantics.
+
+        Returns: (places: List[dict], total_count: int)
         """
+        LP_PAGE_SIZE = 20
+        LP_MAX_CAP   = 60
+        effective_max = min(max_results, LP_MAX_CAP)
+
+        collected: list = []
+        start = 0
+
+        while len(collected) < effective_max:
+            logger.info(f"SerpAPI local pack request — query={query!r} start={start}")
+            try:
+                data = self._request_local_pack(query, start=start, location=location)
+            except Exception as exc:
+                logger.warning(f"SerpAPI local pack request failed at start={start}: {exc}")
+                break
+
+            if "error" in data:
+                logger.warning(f"SerpAPI local pack returned error: {data['error']}")
+                break
+
+            local = data.get("local_results", {})
+            places_raw = local if isinstance(local, list) else local.get("places", [])
+            page = self._parse_local_places(places_raw)
+
+            if not page:
+                logger.info("SerpAPI local pack: empty page, stopping pagination")
+                break
+
+            collected.extend(page)
+            logger.info(f"SerpAPI local pack: page_len={len(page)} collected={len(collected)}")
+
+            # Check for next page signal
+            next_link = (
+                data.get("serpapi_pagination", {}).get("next")
+                or data.get("pagination", {}).get("next_link")
+            )
+            if not next_link:
+                break
+
+            start += LP_PAGE_SIZE
+
+        results = collected[:effective_max]
+        logger.info(f"SerpAPI local pack: {len(results)} place(s) total (cap={effective_max})")
+        return results, len(results)
+
+    def _request_local_pack(self, query: str, start: int = 0, location: str = "") -> dict:
         params = {
             "q": query,
             "api_key": self._key,
             "engine": "google_local",
+            "start": start,
             "hl": "en",
             "gl": "us",
         }
         if location:
             params["location"] = location
 
-        logger.info(f"SerpAPI local pack request — query={query!r}")
         try:
             resp = httpx.get(SERPAPI_BASE, params=params, timeout=30)
             resp.raise_for_status()
-            data = resp.json()
+            return resp.json()
         except httpx.HTTPStatusError as exc:
             logger.warning(
                 f"SerpAPI local pack HTTP {exc.response.status_code}: "
                 f"{exc.response.text[:200]}"
             )
-            return []
+            return {}
         except httpx.RequestError as exc:
             logger.warning(f"SerpAPI local pack request error: {exc}")
-            return []
+            return {}
         except Exception as exc:
             logger.warning(f"SerpAPI local pack unexpected error: {exc}")
-            return []
-
-        if "error" in data:
-            logger.warning(f"SerpAPI local pack returned error: {data['error']}")
-            return []
-
-        local = data.get("local_results", {})
-        if isinstance(local, list):
-            places = local
-        else:
-            places = local.get("places", [])
-        results = self._parse_local_places(places)
-        results = results[:max_results]
-        result_count = len(results)
-        logger.info(f"SerpAPI local pack: {len(results)} place(s) returned")
-        return results, result_count
+            return {}
 
     def _request(self, query: str, start: int) -> dict:
         params = {

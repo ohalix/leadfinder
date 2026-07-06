@@ -117,9 +117,20 @@ def upsert_lead(hit: ExtractionHit, run_id: str, query: str, source_engine: str)
     return lead_id
 
 
-def query_leads(query: Optional[str] = None, domain: Optional[str] = None, confidence: Optional[str] = None, contact_type: Optional[str] = None, limit: int = 200, offset: int = 0) -> List[Dict[str, Any]]:
+def query_leads(
+    query: Optional[str] = None,
+    domain: Optional[str] = None,
+    confidence: Optional[str] = None,
+    contact_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 200,
+    offset: int = 0,
+) -> List[Dict[str, Any]]:
     """
     Filtered lead list with aggregated source URLs and queries.
+    date_from / date_to are YYYY-MM-DD strings applied to l.first_seen.
+    SQLite ISO text comparison is lexicographically correct for these dates.
     Ordered by seen_count DESC, last_seen DESC.
     """
     conditions: List[str] = []
@@ -137,6 +148,13 @@ def query_leads(query: Optional[str] = None, domain: Optional[str] = None, confi
     if contact_type:
         conditions.append("l.contact_type = ?")
         params.append(contact_type)
+    if date_from:
+        conditions.append("l.first_seen >= ?")
+        params.append(date_from)
+    if date_to:
+        # Include the full end day by comparing against midnight of the next day
+        conditions.append("l.first_seen <= ?")
+        params.append(f"{date_to} 23:59:59")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
@@ -202,3 +220,44 @@ def leads_by_type() -> Dict[str, int]:
             "SELECT contact_type, COUNT(*) AS c FROM leads GROUP BY contact_type"
         ).fetchall()
     return {r["contact_type"]: r["c"] for r in rows}
+
+# ── Email sends ──
+
+def record_email_send(
+    lead_id: Optional[str],
+    recipient: str,
+    subject: str,
+    status: str,
+    error: Optional[str] = None,
+    run_label: Optional[str] = None,
+) -> str:
+    send_id = _uid()
+    now = _now()
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO email_sends
+               (id, lead_id, recipient, subject, status, error, sent_at, created_at, run_label)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (
+                send_id, lead_id, recipient, subject, status, error,
+                now if status == "sent" else None, now, run_label,
+            ),
+        )
+    return send_id
+
+
+def get_email_send_history(limit: int = 200) -> List[Dict[str, Any]]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT * FROM email_sends ORDER BY created_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def count_email_sends() -> Dict[str, int]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT status, COUNT(*) AS c FROM email_sends GROUP BY status"
+        ).fetchall()
+    return {r["status"]: r["c"] for r in rows}

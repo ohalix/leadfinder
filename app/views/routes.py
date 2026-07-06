@@ -1,9 +1,3 @@
-"""
-Frontend (template) routes.
-
-These serve HTML pages — all data fetching for the UI happens via the
-/api/* JSON routes called from JavaScript in the templates.
-"""
 from __future__ import annotations
 import logging
 from flask import Blueprint, render_template, request
@@ -39,12 +33,16 @@ def leads():
     domain       = request.args.get("domain") or ""
     confidence   = request.args.get("confidence") or ""
     contact_type = request.args.get("contact_type") or ""
+    date_from    = request.args.get("date_from") or ""
+    date_to      = request.args.get("date_to") or ""
 
     leads_data = repository.query_leads(
         query=q or None,
         domain=domain or None,
         confidence=confidence or None,
         contact_type=contact_type or None,
+        date_from=date_from or None,
+        date_to=date_to or None,
         limit=200,
         offset=0,
     )
@@ -53,10 +51,12 @@ def leads():
         "leads.html",
         leads=leads_data,
         filters={
-            "query": q,
-            "domain": domain,
-            "confidence": confidence,
+            "query":        q,
+            "domain":       domain,
+            "confidence":   confidence,
             "contact_type": contact_type,
+            "date_from":    date_from,
+            "date_to":      date_to,
         },
         total=len(leads_data),
     )
@@ -64,3 +64,9 @@ def leads():
 @views_bp.route("/leads/export")
 def leads_export():
     return render_template("export.html")
+
+
+@views_bp.route("/email")
+def email():
+    email_counts = repository.count_email_sends()
+    return render_template("email.html", email_counts=email_counts)

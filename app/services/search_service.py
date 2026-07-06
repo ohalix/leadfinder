@@ -60,8 +60,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
     except (SerpAPIError, ValueError) as exc:
         logger.error(f"[{run_id}] SERP failed: {exc}")
         repository.complete_run(run_id, 0, 0, "failed")
-        if "[Errno 11001]" in str(exc):
-            error = "Network/Internet Connection Error"
+        error = "Network/Internet Connection Error" if "[Errno 11001]" in str(exc) else str(exc)
         return _error_response(run_id, error)
 
     logger.info(f"[{run_id}] SERP returned {len(serp_results):,d} result(s)")
@@ -155,6 +154,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
     # ── 3b. Local Pack Call ──
     lp_phones_injected = 0
     lp_pages_scraped   = 0
+    lp_result_count    = 0
     try:
         local_places, lp_result_count = client.search_local_pack(query, max_results=local_pack_max_results)
         for place in local_places:

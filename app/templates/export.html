@@ -11,7 +11,7 @@
 
 <div class="two-col">
 
-  <!-- ── Filter & download ────────────────────────────────────────────────── -->
+  <!-- ── Filter & download ── -->
   <div class="card">
     <div class="card-header">Export options</div>
 
@@ -41,6 +41,14 @@
           <option value="phone">Phones only</option>
         </select>
       </label>
+      <label class="form-label">
+        First seen from
+        <input type="date" id="exp-date-from" class="form-input" />
+      </label>
+      <label class="form-label">
+        First seen to
+        <input type="date" id="exp-date-to" class="form-input" />
+      </label>
 
       <div class="export-actions">
         <button type="button" class="btn btn-primary" onclick="downloadCSV()">
@@ -55,7 +63,7 @@
     <div id="api-url-preview" class="code-preview hidden"></div>
   </div>
 
-  <!-- ── Column reference ─────────────────────────────────────────────────── -->
+  <!-- ── Column reference ── -->
   <div class="card">
     <div class="card-header">CSV columns</div>
     <table class="data-table col-ref-table">
@@ -98,10 +106,14 @@ function buildParams() {
   const dom  = document.getElementById('exp-domain').value.trim();
   const conf = document.getElementById('exp-confidence').value;
   const type = document.getElementById('exp-type').value;
+  const df   = document.getElementById('exp-date-from').value;
+  const dt   = document.getElementById('exp-date-to').value;
   if (q)    params.set('query', q);
   if (dom)  params.set('domain', dom);
   if (conf) params.set('confidence', conf);
   if (type) params.set('contact_type', type);
+  if (df)   params.set('date_from', df);
+  if (dt)   params.set('date_to', dt);
   return params;
 }
 

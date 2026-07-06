@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}Email | LeadFinder{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Email Outreach</h1>
+    <p class="page-subtitle">Send targeted emails to leads using your SMTP credentials</p>
+  </div>
+  <div class="header-actions">
+    <span class="muted small">
+      Sent: <span class="mono accent">{{ email_counts.get('sent', 0) }}</span>
+      &nbsp;·&nbsp;
+      Failed: <span class="mono warn">{{ email_counts.get('failed', 0) }}</span>
+    </span>
+  </div>
+</div>
+
+<div class="two-col">
+
+  <!-- ── Composer ──────────────────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header">Compose</div>
+
+    <div class="export-form" style="gap:14px;display:flex;flex-direction:column">
+
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;font-size:12px;color:var(--text-muted);">
+        Template variables: <code class="mono" style="color:var(--accent)">{email}</code>
+        &nbsp;<code class="mono" style="color:var(--accent)">{domain}</code>
+        &nbsp;<code class="mono" style="color:var(--accent)">{query}</code>
+      </div>
+
+      <label class="form-label">
+        Subject
+        <input type="text" id="em-subject" class="form-input"
+          placeholder="Hello from {domain} — following up on your listing" />
+      </label>
+
+      <label class="form-label">
+        Body
+        <textarea id="em-body" class="form-input" rows="8" style="resize:vertical;font-family:var(--font-mono);font-size:12.5px"
+          placeholder="Hi,&#10;&#10;I found your contact at {domain} while searching for {query}.&#10;&#10;Best regards"></textarea>
+      </label>
+
+      <div style="border-top:1px solid var(--border);padding-top:14px">
+        <div class="card-header" style="margin-bottom:12px">Lead filters</div>
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <label class="form-label">
+            Filter by query
+            <input type="text" id="em-query" class="form-input" placeholder="e.g. roofing companies Chicago" />
+          </label>
+          <label class="form-label">
+            Filter by domain
+            <input type="text" id="em-domain" class="form-input" placeholder="e.g. example.com" />
+          </label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <label class="form-label">
+              Confidence
+              <select id="em-confidence" class="form-select">
+                <option value="">All</option>
+                <option value="high">[ HIGH ] only</option>
+                <option value="medium">[ MED ] only</option>
+                <option value="low">[ LOW ] only</option>
+              </select>
+            </label>
+            <label class="form-label">
+              Max recipients
+              <input type="number" id="em-limit" class="form-input" value="100" min="1" max="1000" />
+            </label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <label class="form-label">
+              First seen from
+              <input type="date" id="em-date-from" class="form-input" />
+            </label>
+            <label class="form-label">
+              First seen to
+              <input type="date" id="em-date-to" class="form-input" />
+            </label>
+          </div>
+          <label class="form-label">
+            Delay between sends (seconds)
+            <input type="number" id="em-delay" class="form-input" value="1" min="0" max="60" step="0.5" />
+          </label>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;padding-top:4px">
+        <button type="button" class="btn btn-ghost" onclick="previewEmails()">Preview (5)</button>
+        <button type="button" class="btn btn-primary" onclick="sendEmails()">Send Emails</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Preview / results ─────────────────────────────────────────────────── -->
+  <div>
+
+    <div class="card">
+      <div class="card-header">Preview / Results</div>
+      <div id="em-output">
+        <div class="empty-state" style="padding:20px 0">
+          <p class="muted small">Click Preview to see rendered emails, or Send to dispatch.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-4">
+      <div class="card-header">SMTP setup reference</div>
+      <table class="data-table" style="font-size:12px">
+        <thead><tr><th>Provider</th><th>Host</th><th>Port</th></tr></thead>
+        <tbody>
+          <tr><td>Gmail</td><td class="mono">smtp.gmail.com</td><td class="mono">587</td></tr>
+          <tr><td>Outlook/Office 365</td><td class="mono">smtp.office365.com</td><td class="mono">587</td></tr>
+          <tr><td>SendGrid</td><td class="mono">smtp.sendgrid.net</td><td class="mono">587</td></tr>
+          <tr><td>Mailgun</td><td class="mono">smtp.mailgun.org</td><td class="mono">587</td></tr>
+          <tr><td>Brevo (Sendinblue)</td><td class="mono">smtp-relay.brevo.com</td><td class="mono">587</td></tr>
+        </tbody>
+      </table>
+      <p class="muted small mt-4">Set <code class="mono" style="color:var(--accent)">SMTP_HOST</code>, <code class="mono" style="color:var(--accent)">SMTP_USERNAME</code>, <code class="mono" style="color:var(--accent)">SMTP_PASSWORD</code>, and <code class="mono" style="color:var(--accent)">SMTP_FROM</code> in your <code class="mono">.env</code> file.</p>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function buildEmailPayload() {
+  return {
+    subject:     document.getElementById('em-subject').value.trim(),
+    body:        document.getElementById('em-body').value.trim(),
+    query:       document.getElementById('em-query').value.trim() || null,
+    domain:      document.getElementById('em-domain').value.trim() || null,
+    confidence:  document.getElementById('em-confidence').value || null,
+    date_from:   document.getElementById('em-date-from').value || null,
+    date_to:     document.getElementById('em-date-to').value || null,
+    limit:       parseInt(document.getElementById('em-limit').value || '100', 10),
+    rate_delay:  parseFloat(document.getElementById('em-delay').value || '1'),
+  };
+}
+
+async function previewEmails() {
+  const payload = buildEmailPayload();
+  if (!payload.subject || !payload.body) {
+    showToast('Subject and body are required');
+    return;
+  }
+  const out = document.getElementById('em-output');
+  out.innerHTML = '<p class="muted small" style="padding:12px 0">Loading preview…</p>';
+
+  try {
+    const resp = await fetch('/api/email/preview', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { out.innerHTML = `<p class="muted small" style="color:var(--red);padding:12px 0">${escHtml(data.error || 'Preview failed')}</p>`; return; }
+
+    let html = `<p class="muted small" style="padding:8px 0 12px">Would send to <strong>${data.total_would_send}</strong> lead(s). Showing first ${data.previews.length}:</p>`;
+    for (const p of data.previews) {
+      if (p.error) {
+        html += `<div class="lead-row"><div class="lead-main"><div class="mono small" style="color:var(--red)">${escHtml(p.to)}: ${escHtml(p.error)}</div></div></div>`;
+      } else {
+        html += `<div class="lead-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+          <div class="mono small accent">&gt; ${escHtml(p.to)}</div>
+          <div class="small muted"><strong>Subject:</strong> ${escHtml(p.subject)}</div>
+          <div class="small muted" style="white-space:pre-wrap;max-height:80px;overflow:hidden">${escHtml(p.body)}</div>
+        </div>`;
+      }
+    }
+    out.innerHTML = html;
+  } catch (err) {
+    out.innerHTML = `<p class="muted small" style="color:var(--red);padding:12px 0">Error: ${escHtml(err.message)}</p>`;
+  }
+}
+
+async function sendEmails() {
+  const payload = buildEmailPayload();
+  if (!payload.subject || !payload.body) {
+    showToast('Subject and body are required');
+    return;
+  }
+
+  const out = document.getElementById('em-output');
+  out.innerHTML = '<p class="muted small" style="padding:12px 0">Sending… this may take a while.</p>';
+
+  try {
+    const resp = await fetch('/api/email/send', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      out.innerHTML = `<div class="alert alert-error" style="margin:0">${escHtml(data.error || 'Send failed')}</div>`;
+      return;
+    }
+
+    let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-bottom:14px">
+      <div class="summary-item"><div class="summary-val mono accent">${data.sent}</div><div class="summary-key">Sent</div></div>
+      <div class="summary-item"><div class="summary-val mono warn">${data.failed}</div><div class="summary-key">Failed</div></div>
+    </div>`;
+
+    for (const r of (data.results || [])) {
+      const color = r.status === 'sent' ? 'var(--accent)' : 'var(--red)';
+      html += `<div class="lead-row">
+        <div class="lead-main">
+          <div class="mono small" style="color:${color}">${r.status === 'sent' ? '✓' : '✗'} ${escHtml(r.email)}</div>
+          ${r.error ? `<div class="small muted" style="color:var(--red)">${escHtml(r.error)}</div>` : ''}
+        </div>
+      </div>`;
+    }
+
+    out.innerHTML = html;
+  } catch (err) {
+    out.innerHTML = `<p class="muted small" style="color:var(--red);padding:12px 0">Error: ${escHtml(err.message)}</p>`;
+  }
+}
+</script>
+{% endblock %}

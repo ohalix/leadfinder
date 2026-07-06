@@ -121,5 +121,23 @@ def _create_schema(conn: sqlite3.Connection) -> None:
     CREATE INDEX IF NOT EXISTS idx_src_lead ON lead_sources(lead_id);
     CREATE INDEX IF NOT EXISTS idx_src_run  ON lead_sources(run_id);
     CREATE INDEX IF NOT EXISTS idx_src_query ON lead_sources(query);
+
+    -- ── email_sends ───────────────────────────────────────────────────────
+    -- Tracks every outbound email: recipient, status, error, timestamp.
+    CREATE TABLE IF NOT EXISTS email_sends (
+        id          TEXT    PRIMARY KEY,
+        lead_id     TEXT,
+        recipient   TEXT    NOT NULL,
+        subject     TEXT    NOT NULL,
+        status      TEXT    NOT NULL DEFAULT 'pending',
+        error       TEXT,
+        sent_at     TEXT,
+        created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+        run_label   TEXT,
+        FOREIGN KEY (lead_id) REFERENCES leads(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_recipient ON email_sends(recipient);
+    CREATE INDEX IF NOT EXISTS idx_email_status    ON email_sends(status);
+    CREATE INDEX IF NOT EXISTS idx_email_created   ON email_sends(created_at);
     """)
     conn.commit()

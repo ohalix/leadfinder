@@ -40,6 +40,22 @@
     <option value="email" {% if filters.contact_type == 'email' %}selected{% endif %}>E-mails</option>
     <option value="phone" {% if filters.contact_type == 'phone' %}selected{% endif %}>Phones</option>
   </select>
+  <input
+    type="date"
+    name="date_from"
+    value="{{ filters.date_from }}"
+    class="filter-input"
+    style="width:150px"
+    title="First seen from"
+  />
+  <input
+    type="date"
+    name="date_to"
+    value="{{ filters.date_to }}"
+    class="filter-input"
+    style="width:150px"
+    title="First seen to"
+  />
   <button type="submit" class="btn btn-ghost btn-sm">Apply</button>
   <a href="{{ url_for('views.leads') }}" class="btn btn-ghost btn-sm">Clear</a>
 </form>
