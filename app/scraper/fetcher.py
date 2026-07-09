@@ -22,7 +22,6 @@ from app.scraper.robots import is_allowed
 
 logger = logging.getLogger(__name__)
 _TRANSIENT_CODES = {429, 500, 502, 503, 504}
-_TERMINAL_CODES  = {400, 401, 403, 404, 405, 410, 451}
 
 
 def _is_transient(exc: Exception) -> bool:

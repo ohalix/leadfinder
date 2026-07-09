@@ -8,12 +8,14 @@ from app.models import ExtractionHit
 
 logger = logging.getLogger(__name__)
 _METHOD_PRIORITY: Dict[str, int] = {
-    "schema": 5,
-    "mailto": 4,
-    "tel":    4,
-    "footer": 3,
-    "text":   2,
-    "playwright": 1
+    "schema":    5,
+    "microdata": 5,   # same tier as JSON-LD — both are machine-readable structured data
+    "mailto":    4,
+    "tel":       4,
+    "meta":      3,   # meta tags are less reliable than explicit links
+    "footer":    3,
+    "text":      2,
+    "playwright": 1,
 }
 
 
