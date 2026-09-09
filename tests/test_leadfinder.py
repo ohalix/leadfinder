@@ -14,15 +14,18 @@ Covers:
 
 Run: python -m pytest tests/ -v
 """
+
 from __future__ import annotations
 
 import os
 import tempfile
+
 import pytest
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="session")
 def app():
@@ -30,9 +33,10 @@ def app():
     db_fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(db_fd)
     os.environ["DATABASE_PATH"] = db_path
-    os.environ["SERP_API_KEY"]  = "test-key-not-real"
+    os.environ["SERP_API_KEY"] = "test-key-not-real"
 
     from app import create_app
+
     _app = create_app()
     _app.config["TESTING"] = True
 
@@ -56,6 +60,7 @@ def app_ctx(app):
 # Config
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestConfig:
     def test_domain_denylist_is_frozenset(self, app):
         dl = app.config["DOMAIN_DENYLIST"]
@@ -73,6 +78,7 @@ class TestConfig:
 # ─────────────────────────────────────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestAPIRoutes:
     def test_health(self, client):
@@ -103,7 +109,7 @@ class TestAPIRoutes:
         assert "query" in r.get_json()["error"]
 
     def test_search_max_results_bounds(self, client):
-        r = client.post("/api/search", json={"query": "test", "max_results": 999})
+        r = client.post("/api/search", json={"query": "test", "max_results": 100})
         assert r.status_code == 400
 
     def test_leads_export_empty_csv(self, client):
@@ -137,11 +143,13 @@ class TestDashboardRoutes:
 # Email normalizer
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestEmailNormalize:
     def setup_method(self):
-        from app.normalize.email import normalize_email, is_junk_email
+        from app.normalize.email import is_junk_email, normalize_email
+
         self.normalize = normalize_email
-        self.is_junk   = is_junk_email
+        self.is_junk = is_junk_email
 
     def test_lowercases(self):
         assert self.normalize("INFO@ACME.COM") == "info@acme.com"
@@ -182,11 +190,13 @@ class TestEmailNormalize:
 # Phone normalizer
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestPhoneNormalize:
     def setup_method(self):
-        from app.normalize.phone import normalize_phone, is_junk_phone
+        from app.normalize.phone import is_junk_phone, normalize_phone
+
         self.normalize = normalize_phone
-        self.is_junk   = is_junk_phone
+        self.is_junk = is_junk_phone
 
     def test_e164_us_full(self):
         assert self.normalize("+1 (415) 555-1234", "US") == "+14155551234"
@@ -218,18 +228,23 @@ class TestPhoneNormalize:
 # Deduplication
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestDedup:
     def setup_method(self):
-        from app.normalize.dedupe import dedup_hits
         from app.models import ExtractionHit
+        from app.normalize.dedupe import dedup_hits
+
         self.dedup = dedup_hits
-        self.Hit   = ExtractionHit
+        self.Hit = ExtractionHit
 
     def _hit(self, value, confidence="medium", method="text", ctype="email"):
         return self.Hit(
-            contact_type=ctype, raw_value=value,
-            normalized_value=value, method=method,
-            confidence=confidence, source_url="https://example.com/",
+            contact_type=ctype,
+            raw_value=value,
+            normalized_value=value,
+            method=method,
+            confidence=confidence,
+            source_url="https://example.com/",
         )
 
     def test_dedup_removes_exact_duplicates(self):
@@ -250,8 +265,13 @@ class TestDedup:
         # Dedup operates on normalized_value; simulate what the normalization
         # layer would produce: lowercased values for both hits.
         from app.models import ExtractionHit
-        h1 = ExtractionHit("email", "A@B.COM", "a@b.com", "text", "medium", "https://x.com/")
-        h2 = ExtractionHit("email", "a@b.com", "a@b.com", "text", "medium", "https://x.com/")
+
+        h1 = ExtractionHit(
+            "email", "A@B.COM", "a@b.com", "text", "medium", "https://x.com/"
+        )
+        h2 = ExtractionHit(
+            "email", "a@b.com", "a@b.com", "text", "medium", "https://x.com/"
+        )
         assert len(self.dedup([h1, h2])) == 1
 
 
@@ -259,18 +279,23 @@ class TestDedup:
 # Confidence scoring
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestConfidenceScoring:
     def setup_method(self):
         from app.extraction.confidence import score_hits
         from app.models import ExtractionHit
+
         self.score = score_hits
-        self.Hit   = ExtractionHit
+        self.Hit = ExtractionHit
 
     def _hit(self, email, confidence="medium"):
         return self.Hit(
-            contact_type="email", raw_value=email,
-            normalized_value=email, method="footer",
-            confidence=confidence, source_url="https://acme.com/",
+            contact_type="email",
+            raw_value=email,
+            normalized_value=email,
+            method="footer",
+            confidence=confidence,
+            source_url="https://acme.com/",
         )
 
     def test_domain_match_upgrades_confidence(self):
@@ -298,24 +323,26 @@ class TestConfidenceScoring:
 # Structured data extraction
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestStructuredExtraction:
     def setup_method(self):
         from app.extraction.structured import extract_structured
+
         self.extract = extract_structured
 
     def test_organization_type(self):
-        html = '''<script type="application/ld+json">
+        html = """<script type="application/ld+json">
         {"@type":"Organization","email":"contact@corp.com","telephone":"+1-800-123-4567"}
-        </script>'''
+        </script>"""
         hits = self.extract(html, "https://corp.com/")
         types = {h.contact_type for h in hits}
         assert "email" in types
         assert "phone" in types
 
     def test_local_business_type(self):
-        html = '''<script type="application/ld+json">
+        html = """<script type="application/ld+json">
         {"@type":"LocalBusiness","telephone":"+1-312-555-9000"}
-        </script>'''
+        </script>"""
         hits = self.extract(html, "https://local.com/")
         assert any(h.contact_type == "phone" for h in hits)
 
@@ -325,9 +352,9 @@ class TestStructuredExtraction:
         assert hits == []
 
     def test_confidence_is_high(self):
-        html = '''<script type="application/ld+json">
+        html = """<script type="application/ld+json">
         {"@type":"Organization","email":"hi@x.io"}
-        </script>'''
+        </script>"""
         hits = self.extract(html, "https://x.io/")
         assert all(h.confidence == "high" for h in hits)
 
@@ -341,9 +368,11 @@ class TestStructuredExtraction:
 # Pattern extraction (tiers 2–4)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestPatternExtraction:
     def setup_method(self):
         from app.extraction.patterns import extract_patterns
+
         self.extract = extract_patterns
 
     def test_tel_link(self):
@@ -358,13 +387,13 @@ class TestPatternExtraction:
         assert any("hi@co.com" in h.raw_value for h in email_hits)
 
     def test_footer_zone_medium_confidence(self):
-        html = '<footer>Contact: support@widgetco.io | 800-555-0100</footer>'
+        html = "<footer>Contact: support@widgetco.io | 800-555-0100</footer>"
         hits = self.extract(html, "https://widgetco.io/")
         footer_hits = [h for h in hits if h.method == "footer"]
         assert len(footer_hits) > 0
 
     def test_junk_filtered_in_tier4(self):
-        html = '<body><p>test@test.com</p><p>real@corp.com</p></body>'
+        html = "<body><p>test@test.com</p><p>real@corp.com</p></body>"
         hits = self.extract(html, "https://corp.com/")
         values = [h.raw_value for h in hits if h.contact_type == "email"]
         assert "test@test.com" not in values
@@ -379,16 +408,18 @@ class TestPatternExtraction:
 # Contact-page discovery
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestContactPageDiscovery:
     def setup_method(self):
         from app.scraper.discovery import find_contact_page
+
         self.find = find_contact_page
 
     def test_finds_contact_link(self):
-        html = '''<html><body>
+        html = """<html><body>
         <a href="/contact">Contact Us</a>
         <a href="/about">About</a>
-        </body></html>'''
+        </body></html>"""
         result = self.find(html, "https://site.com/")
         assert result == "https://site.com/contact"
 
@@ -406,10 +437,10 @@ class TestContactPageDiscovery:
         assert self.find("", "https://site.com/") is None
 
     def test_prefers_contact_over_about(self):
-        html = '''<html><body>
+        html = """<html><body>
         <a href="/about">About</a>
         <a href="/contact-us">Contact Us</a>
-        </body></html>'''
+        </body></html>"""
         result = self.find(html, "https://site.com/")
         assert "contact" in result
 
@@ -418,18 +449,23 @@ class TestContactPageDiscovery:
 # Storage / repository integration
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestRepository:
     def setup_method(self):
-        from app.storage import repository
         from app.models import ExtractionHit
+        from app.storage import repository
+
         self.repo = repository
-        self.Hit  = ExtractionHit
+        self.Hit = ExtractionHit
 
     def _hit(self, value, ctype="email", method="schema", confidence="high"):
         return self.Hit(
-            contact_type=ctype, raw_value=value,
-            normalized_value=value, method=method,
-            confidence=confidence, source_url="https://test.com/",
+            contact_type=ctype,
+            raw_value=value,
+            normalized_value=value,
+            method=method,
+            confidence=confidence,
+            source_url="https://test.com/",
         )
 
     def test_create_and_get_run(self, app_ctx):
@@ -462,29 +498,35 @@ class TestRepository:
 
     def test_query_filter_by_confidence(self, app_ctx):
         self.repo.create_run("r5", "q5", "serpapi")
-        self.repo.upsert_lead(self._hit("hi@conf.io", confidence="high"), "r5", "q5", "serpapi")
-        self.repo.upsert_lead(self._hit("lo@conf.io", confidence="low"),  "r5", "q5", "serpapi")
+        self.repo.upsert_lead(
+            self._hit("hi@conf.io", confidence="high"), "r5", "q5", "serpapi"
+        )
+        self.repo.upsert_lead(
+            self._hit("lo@conf.io", confidence="low"), "r5", "q5", "serpapi"
+        )
         highs = self.repo.query_leads(confidence="high")
-        lows  = self.repo.query_leads(confidence="low")
+        lows = self.repo.query_leads(confidence="low")
         assert any(l["normalized_value"] == "hi@conf.io" for l in highs)
         assert any(l["normalized_value"] == "lo@conf.io" for l in lows)
 
     def test_count_leads_and_runs(self, app_ctx):
         leads_before = self.repo.count_leads()
-        runs_before  = self.repo.count_runs()
+        runs_before = self.repo.count_runs()
         self.repo.create_run("r6", "q6", "serpapi")
         self.repo.upsert_lead(self._hit("cnt@test.org"), "r6", "q6", "serpapi")
         assert self.repo.count_leads() >= leads_before + 1
-        assert self.repo.count_runs()  >= runs_before  + 1
+        assert self.repo.count_runs() >= runs_before + 1
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Playwright renderer helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestPlaywrightHelpers:
     def setup_method(self):
         from app.scraper.playwright_renderer import is_js_shell
+
         self.is_shell = is_js_shell
 
     def test_empty_is_shell(self):
@@ -494,7 +536,11 @@ class TestPlaywrightHelpers:
         assert self.is_shell("<html><body></body></html>") is True
 
     def test_full_page_not_shell(self):
-        big = "<html><body>" + "<p>Content here with real text. " * 50 + "</p></body></html>"
+        big = (
+            "<html><body>"
+            + "<p>Content here with real text. " * 50
+            + "</p></body></html>"
+        )
         assert self.is_shell(big) is False
 
 
@@ -502,24 +548,29 @@ class TestPlaywrightHelpers:
 # SERP client
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestSerpClient:
     def test_factory_serpapi(self):
-        from app.serp.client import get_serp_client, SerpAPIClient
+        from app.serp.client import SerpAPIClient, get_serp_client
+
         client = get_serp_client("serpapi", "dummy-key")
         assert isinstance(client, SerpAPIClient)
 
     def test_factory_unknown_provider(self):
         from app.serp.client import get_serp_client
+
         with pytest.raises(ValueError, match="Unsupported SERP provider"):
             get_serp_client("nonexistent", "key")
 
     def test_empty_key_raises(self):
         from app.serp.client import SerpAPIClient, SerpAPIError
+
         with pytest.raises(SerpAPIError, match="SERP_API_KEY"):
             SerpAPIClient("")
 
     def test_domain_extraction(self):
         from app.serp.client import _domain
+
         assert _domain("https://www.acme.com/path?q=1") == "acme.com"
         assert _domain("https://blog.example.org/post") == "blog.example.org"
         assert _domain("") == ""

@@ -33,7 +33,7 @@ def send_one(
     to: str,
     subject: str,
     body: str,
-    html: bool = False,
+    html_body: bool = False,
 ) -> None:
     """
     Send a single email. Raises SMTPError on failure so the caller
@@ -57,7 +57,7 @@ def send_one(
     msg["From"]    = f"{from_name} <{from_addr}>"
     msg["To"]      = to
     msg["Subject"] = subject
-    msg.attach(MIMEText(body, "html" if html else "plain", "utf-8"))
+    msg.attach(MIMEText(body, "html" if html_body else "plain", "utf-8"))
 
     try:
         if use_tls:

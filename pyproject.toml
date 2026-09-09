@@ -12,6 +12,7 @@ dependencies = [
     "phonenumbers>=9.0.33",
     "playwright>=1.61.0",
     "protego>=0.6.2",
+    "pytest>=9.1.1",
     "python-dotenv>=1.2.2",
     "tenacity>=9.1.4",
 ]
