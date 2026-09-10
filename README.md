@@ -1,6 +1,6 @@
 # LeadFinder
 
-LeadFinder is a B2B lead-generation tool for small-to-mid sales teams and freelancers: a natural-language keyword query drives a SerpApi search, concurrent page scraping and searches, and extraction of business emails and phone numbers into persistent storage, surfaced through a Flask web dashboard.
+**LeadFinder** is a B2B lead-generation tool for small-to-mid sales teams and freelancers: a natural-language keyword query drives a **SerpApi** search, concurrent page scraping and searches, and extraction of business emails and phone numbers into persistent storage, surfaced through a Flask web dashboard.
 
 ## Architecture
 
