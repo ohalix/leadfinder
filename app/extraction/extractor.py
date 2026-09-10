@@ -1,20 +1,22 @@
 from __future__ import annotations
+
 import logging
 from typing import Dict, List, Tuple
-from app.extraction.structured import extract_structured
-from app.extraction.patterns import extract_patterns
+
 from app.extraction.confidence import score_hits, site_domain
+from app.extraction.patterns import extract_patterns
+from app.extraction.structured import extract_structured
 from app.models import ExtractionHit
 
 logger = logging.getLogger(__name__)
 _METHOD_PRIORITY: Dict[str, int] = {
-    "schema":    5,
-    "microdata": 5,   # same tier as JSON-LD — both are machine-readable structured data
-    "mailto":    4,
-    "tel":       4,
-    "meta":      3,   # meta tags are less reliable than explicit links
-    "footer":    3,
-    "text":      2,
+    "schema": 5,
+    "microdata": 5,  # same tier as JSON-LD — both are machine-readable structured data
+    "mailto": 4,
+    "tel": 4,
+    "meta": 3,  # meta tags are less reliable than explicit links
+    "footer": 3,
+    "text": 2,
     "playwright": 1,
 }
 
@@ -25,15 +27,17 @@ def extract_contacts(html: str, source_url: str) -> List[ExtractionHit]:
 
     sdom = site_domain(source_url)
     structured_hits = extract_structured(html, source_url)
-    pattern_hits    = extract_patterns(html, source_url)
+    pattern_hits = extract_patterns(html, source_url)
 
     all_hits = structured_hits + pattern_hits
-    deduped  = _dedup(all_hits)
-    scored   = score_hits(deduped, sdom)
+    deduped = _dedup(all_hits)
+    scored = score_hits(deduped, sdom)
 
     logger.debug(
-        f"extract_contacts({source_url}): structured={len(structured_hits):,d} patterns={len(pattern_hits):,d} → deduped={len(deduped):,d} scored={len(scored):,d}")
+        f"extract_contacts({source_url}): structured={len(structured_hits):,d} patterns={len(pattern_hits):,d} → deduped={len(deduped):,d} scored={len(scored):,d}"
+    )
     return scored
+
 
 def _dedup(hits: List[ExtractionHit]) -> List[ExtractionHit]:
     best: Dict[Tuple[str, str], ExtractionHit] = {}
@@ -42,7 +46,9 @@ def _dedup(hits: List[ExtractionHit]) -> List[ExtractionHit]:
         if key not in best:
             best[key] = hit
         else:
-            if _METHOD_PRIORITY.get(hit.method, 0) > _METHOD_PRIORITY.get(best[key].method, 0):
+            if _METHOD_PRIORITY.get(hit.method, 0) > _METHOD_PRIORITY.get(
+                best[key].method, 0
+            ):
                 best[key] = hit
 
     return list(best.values())

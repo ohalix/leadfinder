@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import logging
 import re
 from typing import List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
+
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
@@ -44,22 +46,34 @@ def find_contact_page(html: str, base_url: str) -> Optional[str]:
 
             # Reject non-HTML extensions
             path = parsed.path.lower()
-            if any(path.endswith(ext) for ext in (
-                ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".svg",
-                ".zip", ".doc", ".docx", ".xls", ".xlsx",
-            )):
+            if any(
+                path.endswith(ext)
+                for ext in (
+                    ".pdf",
+                    ".jpg",
+                    ".jpeg",
+                    ".png",
+                    ".gif",
+                    ".svg",
+                    ".zip",
+                    ".doc",
+                    ".docx",
+                    ".xls",
+                    ".xlsx",
+                )
+            ):
                 continue
 
             anchor_text = (a_tag.get_text(separator=" ", strip=True) or "").lower()
             score = 0
             if _CONTACT_PRIMARY_RE.search(path):
-                score += 4              # strong path signal (contact, reach-us …)
+                score += 4  # strong path signal (contact, reach-us …)
             elif _CONTACT_SECONDARY_RE.search(path):
-                score += 2              # weaker path signal (about, support …)
+                score += 2  # weaker path signal (about, support …)
             if _CONTACT_PRIMARY_RE.search(anchor_text):
-                score += 2              # strong text signal
+                score += 2  # strong text signal
             elif _CONTACT_SECONDARY_RE.search(anchor_text):
-                score += 1              # weaker text signal
+                score += 1  # weaker text signal
             # Prefer short paths (/contact, /contact-us) over deeply nested ones
             depth = len([p for p in path.split("/") if p])
             if depth <= 2:

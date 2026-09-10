@@ -1,17 +1,5 @@
-"""
-Playwright JS-rendering fallback.
-
-ONLY invoked when static fetching produces a near-empty body that looks
-like a client-side-rendered shell.  It is never the default fetch path.
-
-If the `playwright` package is not installed the module degrades gracefully:
-    - is_js_shell() still works (regex only)
-    - render_page() logs a warning and returns None
-
-Install (after pip install playwright):
-    playwright install chromium
-"""
 from __future__ import annotations
+
 import logging
 import re
 from typing import Optional
@@ -21,10 +9,13 @@ logger = logging.getLogger(__name__)
 # ── Optional import ──
 _available = False
 try:
-    from playwright.sync_api import (  # type: ignore
-        sync_playwright,
+    from playwright.sync_api import (
         TimeoutError as _PWTimeout,
     )
+    from playwright.sync_api import (  # type: ignore
+        sync_playwright,
+    )
+
     _available = True
 except ImportError:
     logger.info(
@@ -34,6 +25,7 @@ except ImportError:
 
 # ── Public helpers ──
 _STRIP_TAGS = re.compile(r"<[^>]+>")
+
 
 def is_js_shell(html: str) -> bool:
     """
@@ -48,6 +40,7 @@ def is_js_shell(html: str) -> bool:
         return True
     body_text = " ".join(_STRIP_TAGS.sub(" ", html).split())
     return len(body_text) < 200
+
 
 def render_page(url: str, timeout_ms: int = 15_000) -> Optional[str]:
     """
@@ -78,7 +71,9 @@ def render_page(url: str, timeout_ms: int = 15_000) -> Optional[str]:
                     page.wait_for_load_state("networkidle", timeout=timeout_ms)
                 except _PWTimeout:
                     # networkidle can hang on sites with long-polling; proceed anyway
-                    logger.debug(f"networkidle timeout on {url} — using partial content")
+                    logger.debug(
+                        f"networkidle timeout on {url} — using partial content"
+                    )
             except _PWTimeout:
                 logger.warning(f"Playwright navigation timeout on {url}")
                 # Still try to grab whatever rendered

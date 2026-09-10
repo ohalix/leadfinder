@@ -1,54 +1,42 @@
-"""
-Search service — orchestrates the full pipeline:
-
-  1. SERP query via SerpAPI
-  2. Domain denylist filter
-  3. robots.txt check + HTTP fetch (per URL)
-  4. Playwright fallback if JS shell detected
-  5. Tier 1–4 contact extraction
-  6. One same-domain contact-page hop if yield is low
-  7. Normalization + junk filtering
-  8. Cross-page deduplication
-  9. Upsert into SQLite (seen_count tracking)
- 10. Return structured response with leads + run summary
-
-Routes call `run_search()` and nothing else from this layer.
-
-NOTE: `config` is Flask's app.config dict-like object — always use
-      config.get("KEY", default) or config["KEY"], never config.KEY.
-"""
 from __future__ import annotations
+
 import logging
 import time
 import uuid
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
-from app.models import ExtractionHit, FetchOutcome, SerpResult
-from app.scraper.fetcher import fetch_page
-from app.scraper.discovery import find_contact_page
-from app.scraper.playwright_renderer import is_js_shell, render_page
+
 from app.extraction.extractor import extract_contacts
-from app.normalize.email import normalize_email, is_junk_email
-from app.normalize.phone import normalize_phone, is_junk_phone
+from app.models import ExtractionHit, FetchOutcome, SerpResult
 from app.normalize.dedupe import dedup_hits
-from app.serp.client import get_serp_client, SerpAPIError
+from app.normalize.email import is_junk_email, normalize_email
+from app.normalize.phone import is_junk_phone, normalize_phone
+from app.scraper.discovery import find_contact_page
+from app.scraper.fetcher import fetch_page
+from app.scraper.playwright_renderer import is_js_shell, render_page
+from app.serp.client import SerpAPIError, get_serp_client
 from app.storage import repository
 
 logger = logging.getLogger(__name__)
 
 
-def run_search(query: str, config: Any, max_results: Optional[int] = None, local_pack_max_results: int = 10) -> Dict[str, Any]:
-    run_id        = str(uuid.uuid4())
-    max_results   = max_results or config.get("SERP_MAX_RESULTS", 10)
+def run_search(
+    query: str,
+    config: Any,
+    max_results: Optional[int] = None,
+    local_pack_max_results: int = 10,
+) -> Dict[str, Any]:
+    run_id = str(uuid.uuid4())
+    max_results = max_results or config.get("SERP_MAX_RESULTS", 10)
     source_engine = config.get("SERP_PROVIDER", "serpapi")
-    denylist      = config.get("DOMAIN_DENYLIST", frozenset())
-    api_key       = config.get("SERP_API_KEY", "")
-    user_agent    = config.get("USER_AGENT", "LeadFinderBot/0.1")
-    timeout       = config.get("REQUEST_TIMEOUT", 10)
-    rate_delay    = config.get("RATE_LIMIT_DELAY", 1.0)
-    pw_enabled    = config.get("PLAYWRIGHT_ENABLED", False)
-    pw_timeout    = config.get("PLAYWRIGHT_TIMEOUT", 15000)
-    phone_region  = config.get("DEFAULT_PHONE_REGION", "US")
+    denylist = config.get("DOMAIN_DENYLIST", frozenset())
+    api_key = config.get("SERP_API_KEY", "")
+    user_agent = config.get("USER_AGENT", "LeadFinderBot/0.1")
+    timeout = config.get("REQUEST_TIMEOUT", 10)
+    rate_delay = config.get("RATE_LIMIT_DELAY", 1.0)
+    pw_enabled = config.get("PLAYWRIGHT_ENABLED", False)
+    pw_timeout = config.get("PLAYWRIGHT_TIMEOUT", 15000)
+    phone_region = config.get("DEFAULT_PHONE_REGION", "US")
 
     repository.create_run(run_id, query, source_engine)
     logger.info(f"[{run_id}] Search started: {query!r}  max={max_results:,d}")
@@ -60,7 +48,11 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
     except (SerpAPIError, ValueError) as exc:
         logger.error(f"[{run_id}] SERP failed: {exc}")
         repository.complete_run(run_id, 0, 0, "failed")
-        error = "Network/Internet Connection Error" if "[Errno 11001]" in str(exc) else str(exc)
+        error = (
+            "Network/Internet Connection Error"
+            if "[Errno 11001]" in str(exc)
+            else str(exc)
+        )
         return _error_response(run_id, error)
 
     logger.info(f"[{run_id}] SERP returned {len(serp_results):,d} result(s)")
@@ -81,8 +73,8 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
 
     # ── 3–6. Fetch / extract loop ──
     all_hits: List[ExtractionHit] = []
-    outcomes: List[FetchOutcome]  = []
-    seen_urls: set                = set()
+    outcomes: List[FetchOutcome] = []
+    seen_urls: set = set()
     pages_fetched = pages_skipped = pages_failed = 0
 
     for result in allowed:
@@ -123,8 +115,8 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
                 outcome.used_playwright = True
             else:
                 outcome.status = "failed:render_error"
-                outcome.error  = "Playwright render failed or unavailable"
-                pages_failed  += 1
+                outcome.error = "Playwright render failed or unavailable"
+                pages_failed += 1
                 continue
 
         pages_fetched += 1
@@ -150,31 +142,37 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
                     page_hits.extend(extra)
 
         all_hits.extend(page_hits)
-        
+
     # ── 3b. Local Pack Call ──
     lp_phones_injected = 0
-    lp_pages_scraped   = 0
-    lp_result_count    = 0
+    lp_pages_scraped = 0
+    lp_result_count = 0
     try:
-        local_places, lp_result_count = client.search_local_pack(query, max_results=local_pack_max_results)
+        local_places, lp_result_count = client.search_local_pack(
+            query, max_results=local_pack_max_results
+        )
         for place in local_places:
-            phone   = (place.get("phone") or "").strip()
+            phone = (place.get("phone") or "").strip()
             website = (place.get("website") or "").strip()
-            
+
             if phone:
-                all_hits.append(ExtractionHit(
-                    contact_type="phone",
-                    raw_value=phone,
-                    normalized_value=phone,
-                    method="local_pack",
-                    confidence="high",
-                    source_url=website if website is not False else place.get("title", ""),
-                ))
+                all_hits.append(
+                    ExtractionHit(
+                        contact_type="phone",
+                        raw_value=phone,
+                        normalized_value=phone,
+                        method="local_pack",
+                        confidence="high",
+                        source_url=website
+                        if website is not False
+                        else place.get("title", ""),
+                    )
+                )
                 lp_phones_injected += 1
-            
+
             if not website or website in seen_urls:
                 continue
-            
+
             seen_urls.add(website)
             dom = _domain(website)
             if _is_denylisted(dom, denylist):
@@ -223,7 +221,7 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
             logger.info(
                 f"[{run_id}] Local pack: {lp_phones_injected} phone(s) injected, "
                 f"{lp_pages_scraped} website(s) scraped"
-            )   
+            )
     except Exception as exc:
         logger.warning(f"[{run_id}] Local pack direct search failed (non-fatal): {exc}")
 
@@ -272,23 +270,24 @@ def run_search(query: str, config: Any, max_results: Optional[int] = None, local
         outcome_counts[o.status] = outcome_counts.get(o.status, 0) + 1
 
     return {
-        "run_id":        run_id,
-        "query":         query,
+        "run_id": run_id,
+        "query": query,
         "source_engine": source_engine,
-        "leads":         leads,
+        "leads": leads,
         "summary": {
-            "status":             "completed",
+            "status": "completed",
             "total_serp_results": len(serp_results),
-            "pages_fetched":      pages_fetched,
-            "pages_skipped":      pages_skipped,
-            "pages_failed":       pages_failed,
+            "pages_fetched": pages_fetched,
+            "pages_skipped": pages_skipped,
+            "pages_failed": pages_failed,
             "skipped_denylisted": skipped_deny,
-            "contacts_found":     stored,
-            "outcome_breakdown":  outcome_counts,
-            "local_pack_phones":   lp_phones_injected,
+            "contacts_found": stored,
+            "outcome_breakdown": outcome_counts,
+            "local_pack_phones": lp_phones_injected,
             "local_pack_pages_scraped": lp_pages_scraped,
         },
     }
+
 
 # ── Helpers ──
 def _domain(url: str) -> str:
@@ -297,6 +296,7 @@ def _domain(url: str) -> str:
     except Exception:
         return ""
 
+
 def _is_denylisted(domain: str, denylist) -> bool:
     d = domain.lower()
     for deny in denylist:
@@ -304,10 +304,11 @@ def _is_denylisted(domain: str, denylist) -> bool:
             return True
     return False
 
+
 def _error_response(run_id: str, message: str) -> Dict[str, Any]:
     return {
-        "run_id":  run_id,
-        "error":   message,
-        "leads":   [],
+        "run_id": run_id,
+        "error": message,
+        "leads": [],
         "summary": {"status": "failed", "reason": message},
     }

@@ -1,15 +1,9 @@
-"""
-HTTP page fetcher.
-
-- Uses httpx for consistent sync/async API and per-phase timeouts.
-- Retries only on transient failures (timeout, 5xx, connection reset).
-- Never retries 403 / 404 / 410 — those mean skip-and-log.
-- Returns a typed FetchOutcome so callers never raise, they always branch.
-"""
 from __future__ import annotations
+
 import logging
 import time
 from typing import Optional
+
 import httpx
 from tenacity import (
     retry,
@@ -17,6 +11,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential_jitter,
 )
+
 from app.models import FetchOutcome
 from app.scraper.robots import is_allowed
 
@@ -33,9 +28,11 @@ def _is_transient(exc: Exception) -> bool:
         return exc.response.status_code in _TRANSIENT_CODES
     return False
 
+
 def _is_html(content_type: str) -> bool:
     ct = content_type.lower()
     return "text/html" in ct or "application/xhtml" in ct
+
 
 @retry(
     retry=retry_if_exception(_is_transient),
@@ -49,10 +46,11 @@ def _get(url: str, user_agent: str, timeout: int) -> httpx.Response:
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive"
+        "Connection": "keep-alive",
     }
     with httpx.Client(follow_redirects=True, timeout=timeout) as client:
         return client.get(url, headers=headers)
+
 
 def fetch_page(
     url: str,

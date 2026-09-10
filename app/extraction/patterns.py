@@ -1,19 +1,11 @@
-"""
-Tiers 2, 3, 4 — DOM-level and text-level contact extraction.
-
-Priority order within this module:
-  Tier 2  — mailto: and tel: href links                    → confidence: high
-  Tier 2b — data-phone / data-email / data-tel attributes  → confidence: high
-  Tier 3  — semantic DOM zone selectors                    → confidence: medium
-  Tier 4  — full body-text regex fallback                  → confidence: low
-
-Junk filters are applied inline so no noise reaches the normalizer.
-"""
 from __future__ import annotations
+
 import logging
 import re
 from typing import List, Set
+
 from bs4 import BeautifulSoup
+
 from app.models import ExtractionHit
 
 logger = logging.getLogger(__name__)
@@ -25,10 +17,10 @@ EMAIL_RE = re.compile(
 
 # Phone: covers US formats, international with +, extensions
 PHONE_RE = re.compile(
-    r"(?:\+?\d{1,3}[\s.\-]?)?"           # optional country code
-    r"(?:\(?\d{2,4}\)?[\s.\-]?)"          # area / city code
-    r"\d{3,4}[\s.\-]?\d{3,4}"             # main digits
-    r"(?:[\s]?(?:ext|x|#)[\s]?\d{1,5})?", # optional extension
+    r"(?:\+?\d{1,3}[\s.\-]?)?"  # optional country code
+    r"(?:\(?\d{2,4}\)?[\s.\-]?)"  # area / city code
+    r"\d{3,4}[\s.\-]?\d{3,4}"  # main digits
+    r"(?:[\s]?(?:ext|x|#)[\s]?\d{1,5})?",  # optional extension
     re.IGNORECASE,
 )
 
@@ -53,44 +45,50 @@ _ZONE_SELECTORS = [
     # ── HTML5 semantic elements ──
     "footer",
     "header",
-    "address",          # spec-defined contact info container
+    "address",  # spec-defined contact info container
     "aside",
-
     # ── ARIA landmark roles ──
-    "[role='contentinfo']",    # WAI-ARIA semantic footer
+    "[role='contentinfo']",  # WAI-ARIA semantic footer
     "[role='complementary']",  # WAI-ARIA sidebar
-
     # ── Explicit IDs ──
-    "#contact", "#contact-us", "#get-in-touch", "#reach-us",
-
+    "#contact",
+    "#contact-us",
+    "#get-in-touch",
+    "#reach-us",
     # ── Contact class/id patterns (existing) ──
     ".contact",
-    "[class*='contact']", "[id*='contact']",
-
+    "[class*='contact']",
+    "[id*='contact']",
     # ── Footer/header patterns (existing) ──
-    "[class*='footer']", "[id*='footer']",
-    "[class*='header']", "[id*='header']",
-
+    "[class*='footer']",
+    "[id*='footer']",
+    "[class*='header']",
+    "[id*='header']",
     # ── Reach / touch / info (existing) ──
-    "[class*='reach']", "[class*='touch']",
-    "[class*='info']",  "[id*='info']",
-
+    "[class*='reach']",
+    "[class*='touch']",
+    "[class*='info']",
+    "[id*='info']",
     # ── Address and location blocks (new) ──
-    "[class*='address']", "[id*='address']",
-    "[class*='location']", "[id*='location']",
-
+    "[class*='address']",
+    "[id*='address']",
+    "[class*='location']",
+    "[id*='location']",
     # ── Phone-specific containers (new) ──
-    "[class*='phone']", "[id*='phone']",
-    "[class*='tel']",   "[id*='tel']",
-
+    "[class*='phone']",
+    "[id*='phone']",
+    "[class*='tel']",
+    "[id*='tel']",
     # ── Email-specific containers (new) ──
-    "[class*='email']", "[id*='email']",
-
+    "[class*='email']",
+    "[id*='email']",
     # ── vCard / hCard microformat classes (new) ──
-    ".vcard", ".h-card", ".hcard",
-
+    ".vcard",
+    ".h-card",
+    ".hcard",
     # ── About sections (often contain contact info) (new) ──
-    "[class*='about']", "[id*='about']",
+    "[class*='about']",
+    "[id*='about']",
 ]
 
 
@@ -108,6 +106,7 @@ def extract_patterns(html: str, source_url: str) -> List[ExtractionHit]:
         logger.debug(f"Pattern extraction error on {source_url}: {exc}")
     return hits
 
+
 # ── Tier 2 — explicit href links ──
 def _tier2_links(
     soup: BeautifulSoup, source_url: str, hits: List[ExtractionHit]
@@ -118,26 +117,30 @@ def _tier2_links(
         if href.lower().startswith("mailto:"):
             raw = href[7:].split("?")[0].strip()
             if raw and not _JUNK_EMAIL.search(raw):
-                hits.append(ExtractionHit(
-                    contact_type="email",
-                    raw_value=raw,
-                    normalized_value=raw,
-                    method="mailto",
-                    confidence="high",
-                    source_url=source_url,
-                ))
+                hits.append(
+                    ExtractionHit(
+                        contact_type="email",
+                        raw_value=raw,
+                        normalized_value=raw,
+                        method="mailto",
+                        confidence="high",
+                        source_url=source_url,
+                    )
+                )
 
         elif href.lower().startswith("tel:"):
             raw = href[4:].strip()
             if raw and not _JUNK_PHONE.match(raw):
-                hits.append(ExtractionHit(
-                    contact_type="phone",
-                    raw_value=raw,
-                    normalized_value=raw,
-                    method="tel",
-                    confidence="high",
-                    source_url=source_url,
-                ))
+                hits.append(
+                    ExtractionHit(
+                        contact_type="phone",
+                        raw_value=raw,
+                        normalized_value=raw,
+                        method="tel",
+                        confidence="high",
+                        source_url=source_url,
+                    )
+                )
 
 
 # ── Tier 2b — data-attribute contact fields ──
@@ -145,8 +148,13 @@ def _tier2_links(
 # clickable divs/spans/buttons instead of <a href="tel:"> anchors.
 # Common patterns: data-phone, data-tel, data-contact-phone, data-email.
 
-_DATA_PHONE_ATTRS = ("data-phone", "data-tel", "data-telephone",
-                     "data-contact-phone", "data-mobile")
+_DATA_PHONE_ATTRS = (
+    "data-phone",
+    "data-tel",
+    "data-telephone",
+    "data-contact-phone",
+    "data-mobile",
+)
 _DATA_EMAIL_ATTRS = ("data-email", "data-contact-email", "data-mail")
 
 
@@ -158,27 +166,31 @@ def _tier2b_data_attrs(
         for attr in _DATA_PHONE_ATTRS:
             raw = (tag.get(attr) or "").strip()
             if raw and not _JUNK_PHONE.match(raw):
-                hits.append(ExtractionHit(
-                    contact_type="phone",
-                    raw_value=raw,
-                    normalized_value=raw,
-                    method="tel",
-                    confidence="high",
-                    source_url=source_url,
-                ))
+                hits.append(
+                    ExtractionHit(
+                        contact_type="phone",
+                        raw_value=raw,
+                        normalized_value=raw,
+                        method="tel",
+                        confidence="high",
+                        source_url=source_url,
+                    )
+                )
                 break  # only the first matching phone attr per element
 
         for attr in _DATA_EMAIL_ATTRS:
             raw = (tag.get(attr) or "").replace("mailto:", "").split("?")[0].strip()
             if raw and not _JUNK_EMAIL.search(raw):
-                hits.append(ExtractionHit(
-                    contact_type="email",
-                    raw_value=raw,
-                    normalized_value=raw,
-                    method="mailto",
-                    confidence="high",
-                    source_url=source_url,
-                ))
+                hits.append(
+                    ExtractionHit(
+                        contact_type="email",
+                        raw_value=raw,
+                        normalized_value=raw,
+                        method="mailto",
+                        confidence="high",
+                        source_url=source_url,
+                    )
+                )
                 break
 
 
@@ -202,26 +214,31 @@ def _tier3_zones(
 
             for match in EMAIL_RE.findall(text):
                 if not _JUNK_EMAIL.search(match):
-                    hits.append(ExtractionHit(
-                        contact_type="email",
-                        raw_value=match,
-                        normalized_value=match,
-                        method="footer",
-                        confidence="medium",
-                        source_url=source_url,
-                    ))
+                    hits.append(
+                        ExtractionHit(
+                            contact_type="email",
+                            raw_value=match,
+                            normalized_value=match,
+                            method="footer",
+                            confidence="medium",
+                            source_url=source_url,
+                        )
+                    )
 
             for match in PHONE_RE.findall(text):
                 clean = match.strip()
                 if clean and not _JUNK_PHONE.match(clean) and len(clean) >= 7:
-                    hits.append(ExtractionHit(
-                        contact_type="phone",
-                        raw_value=clean,
-                        normalized_value=clean,
-                        method="footer",
-                        confidence="medium",
-                        source_url=source_url,
-                    ))
+                    hits.append(
+                        ExtractionHit(
+                            contact_type="phone",
+                            raw_value=clean,
+                            normalized_value=clean,
+                            method="footer",
+                            confidence="medium",
+                            source_url=source_url,
+                        )
+                    )
+
 
 # ── Tier 4 — full body text ──
 def _tier4_body(
@@ -235,23 +252,27 @@ def _tier4_body(
 
     for match in EMAIL_RE.findall(text):
         if not _JUNK_EMAIL.search(match):
-            hits.append(ExtractionHit(
-                contact_type="email",
-                raw_value=match,
-                normalized_value=match,
-                method="text",
-                confidence="low",
-                source_url=source_url,
-            ))
+            hits.append(
+                ExtractionHit(
+                    contact_type="email",
+                    raw_value=match,
+                    normalized_value=match,
+                    method="text",
+                    confidence="low",
+                    source_url=source_url,
+                )
+            )
 
     for match in PHONE_RE.findall(text):
         clean = match.strip()
         if clean and not _JUNK_PHONE.match(clean) and len(clean) >= 7:
-            hits.append(ExtractionHit(
-                contact_type="phone",
-                raw_value=clean,
-                normalized_value=clean,
-                method="text",
-                confidence="low",
-                source_url=source_url,
-            ))
+            hits.append(
+                ExtractionHit(
+                    contact_type="phone",
+                    raw_value=clean,
+                    normalized_value=clean,
+                    method="text",
+                    confidence="low",
+                    source_url=source_url,
+                )
+            )

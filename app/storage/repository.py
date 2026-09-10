@@ -1,19 +1,24 @@
 from __future__ import annotations
+
 import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
 from app.models import ExtractionHit, SerpResult
 from app.storage.db import get_conn
 
 logger = logging.getLogger(__name__)
 
+
 # ── Utilities ──
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
+
 def _uid() -> str:
     return str(uuid.uuid4())
+
 
 # ── Search run ──
 def create_run(run_id: str, query: str, source_engine: str) -> None:
@@ -24,7 +29,10 @@ def create_run(run_id: str, query: str, source_engine: str) -> None:
             (run_id, query, source_engine, _now()),
         )
 
-def complete_run(run_id: str, total_results: int, total_contacts: int, status: str = "completed") -> None:
+
+def complete_run(
+    run_id: str, total_results: int, total_contacts: int, status: str = "completed"
+) -> None:
     with get_conn() as conn:
         conn.execute(
             """UPDATE search_runs
@@ -33,12 +41,12 @@ def complete_run(run_id: str, total_results: int, total_contacts: int, status: s
             (status, total_results, total_contacts, run_id),
         )
 
+
 def get_run(run_id: str) -> Optional[Dict[str, Any]]:
     with get_conn() as conn:
-        row = conn.execute(
-            "SELECT * FROM search_runs WHERE id=?", (run_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM search_runs WHERE id=?", (run_id,)).fetchone()
     return dict(row) if row else None
+
 
 def get_all_runs(limit: int = 50) -> List[Dict[str, Any]]:
     with get_conn() as conn:
@@ -48,8 +56,11 @@ def get_all_runs(limit: int = 50) -> List[Dict[str, Any]]:
         ).fetchall()
     return [dict(r) for r in rows]
 
+
 # ── SERP results ──
-def insert_serp_result(run_id: str, result: SerpResult, fetch_status: str, fetch_error: Optional[str]) -> None:
+def insert_serp_result(
+    run_id: str, result: SerpResult, fetch_status: str, fetch_error: Optional[str]
+) -> None:
     with get_conn() as conn:
         conn.execute(
             """INSERT OR IGNORE INTO serp_results
@@ -57,11 +68,19 @@ def insert_serp_result(run_id: str, result: SerpResult, fetch_status: str, fetch
                 fetch_status, fetch_error)
                VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (
-                _uid(), run_id, result.url, result.domain,
-                result.title, result.snippet, result.rank, result.source_type,
-                fetch_status, fetch_error,
+                _uid(),
+                run_id,
+                result.url,
+                result.domain,
+                result.title,
+                result.snippet,
+                result.rank,
+                result.source_type,
+                fetch_status,
+                fetch_error,
             ),
         )
+
 
 # ── Leads ──
 def upsert_lead(hit: ExtractionHit, run_id: str, query: str, source_engine: str) -> str:
@@ -79,7 +98,7 @@ def upsert_lead(hit: ExtractionHit, run_id: str, query: str, source_engine: str)
         ).fetchone()
 
         if row:
-            lead_id   = row["id"]
+            lead_id = row["id"]
             new_count = row["seen_count"] + 1
             conn.execute(
                 "UPDATE leads SET seen_count=?, last_seen=? WHERE id=?",
@@ -90,6 +109,7 @@ def upsert_lead(hit: ExtractionHit, run_id: str, query: str, source_engine: str)
             # Derive domain from source URL
             try:
                 from urllib.parse import urlparse
+
                 dom = urlparse(hit.source_url).netloc.lower().replace("www.", "")
             except Exception:
                 dom = ""
@@ -100,9 +120,15 @@ def upsert_lead(hit: ExtractionHit, run_id: str, query: str, source_engine: str)
                     domain, method, confidence, seen_count, first_seen, last_seen)
                    VALUES (?,?,?,?,?,?,?,1,?,?)""",
                 (
-                    lead_id, hit.contact_type, hit.raw_value,
-                    hit.normalized_value, dom, hit.method,
-                    hit.confidence, now, now,
+                    lead_id,
+                    hit.contact_type,
+                    hit.raw_value,
+                    hit.normalized_value,
+                    dom,
+                    hit.method,
+                    hit.confidence,
+                    now,
+                    now,
                 ),
             )
 
@@ -189,7 +215,7 @@ def query_leads(
     for row in rows:
         d = dict(row)
         d["source_urls"] = d["source_urls"].split(",") if d["source_urls"] else []
-        d["queries"]     = list(set(d["queries"].split(","))) if d["queries"] else []
+        d["queries"] = list(set(d["queries"].split(","))) if d["queries"] else []
         results.append(d)
 
     return results
@@ -197,15 +223,18 @@ def query_leads(
 
 # ── Counts ──
 
+
 def count_leads() -> int:
     with get_conn() as conn:
         r = conn.execute("SELECT COUNT(*) AS c FROM leads").fetchone()
     return r["c"] if r else 0
 
+
 def count_runs() -> int:
     with get_conn() as conn:
         r = conn.execute("SELECT COUNT(*) AS c FROM search_runs").fetchone()
     return r["c"] if r else 0
+
 
 def leads_by_confidence() -> Dict[str, int]:
     with get_conn() as conn:
@@ -214,6 +243,7 @@ def leads_by_confidence() -> Dict[str, int]:
         ).fetchall()
     return {r["confidence"]: r["c"] for r in rows}
 
+
 def leads_by_type() -> Dict[str, int]:
     with get_conn() as conn:
         rows = conn.execute(
@@ -221,7 +251,9 @@ def leads_by_type() -> Dict[str, int]:
         ).fetchall()
     return {r["contact_type"]: r["c"] for r in rows}
 
+
 # ── Email sends ──
+
 
 def record_email_send(
     lead_id: Optional[str],
@@ -239,8 +271,15 @@ def record_email_send(
                (id, lead_id, recipient, subject, status, error, sent_at, created_at, run_label)
                VALUES (?,?,?,?,?,?,?,?,?)""",
             (
-                send_id, lead_id, recipient, subject, status, error,
-                now if status == "sent" else None, now, run_label,
+                send_id,
+                lead_id,
+                recipient,
+                subject,
+                status,
+                error,
+                now if status == "sent" else None,
+                now,
+                run_label,
             ),
         )
     return send_id

@@ -1,40 +1,73 @@
 from __future__ import annotations
+
 import json
 import logging
 from typing import List
+
 from bs4 import BeautifulSoup
+
 from app.models import ExtractionHit
 
 logger = logging.getLogger(__name__)
-_CONTACT_TYPES = frozenset({
-    "Organization", "LocalBusiness", "ContactPoint",
-    "Person", "MedicalOrganization", "EducationalOrganization",
-    "FoodEstablishment", "Hotel", "Store", "Service",
-    "ProfessionalService", "LegalService", "FinancialService",
-    "InsuranceAgency", "RealEstateAgent", "AutoDealer",
-})
+_CONTACT_TYPES = frozenset(
+    {
+        "Organization",
+        "LocalBusiness",
+        "ContactPoint",
+        "Person",
+        "MedicalOrganization",
+        "EducationalOrganization",
+        "FoodEstablishment",
+        "Hotel",
+        "Store",
+        "Service",
+        "ProfessionalService",
+        "LegalService",
+        "FinancialService",
+        "InsuranceAgency",
+        "RealEstateAgent",
+        "AutoDealer",
+    }
+)
 
 # Schema.org types whose itemprop contacts should be high-confidence
-_HIGH_CONF_ITEM_TYPES = frozenset({
-    "organization", "localbusiness", "contactpoint",
-    "professionalservice", "legalservice", "financialservice",
-    "foodestablishment", "hotel", "store", "service",
-    "insuranceagency", "realestate", "autodealer",
-    "medicalorganization", "educationalorganization",
-})
+_HIGH_CONF_ITEM_TYPES = frozenset(
+    {
+        "organization",
+        "localbusiness",
+        "contactpoint",
+        "professionalservice",
+        "legalservice",
+        "financialservice",
+        "foodestablishment",
+        "hotel",
+        "store",
+        "service",
+        "insuranceagency",
+        "realestate",
+        "autodealer",
+        "medicalorganization",
+        "educationalorganization",
+    }
+)
 
 # Meta tag name/property values that may contain phone or email
-_META_PHONE_PROPS = frozenset({
-    "telephone", "phone",
-    "business:contact_data:phone_number",   # Facebook OG
-    "og:phone_number",
-    "twitter:phone_number",
-})
-_META_EMAIL_PROPS = frozenset({
-    "email",
-    "og:email",
-    "business:contact_data:email",          # Facebook OG
-})
+_META_PHONE_PROPS = frozenset(
+    {
+        "telephone",
+        "phone",
+        "business:contact_data:phone_number",  # Facebook OG
+        "og:phone_number",
+        "twitter:phone_number",
+    }
+)
+_META_EMAIL_PROPS = frozenset(
+    {
+        "email",
+        "og:email",
+        "business:contact_data:email",  # Facebook OG
+    }
+)
 
 
 def extract_structured(html: str, source_url: str) -> List[ExtractionHit]:
@@ -88,28 +121,32 @@ def _walk(node: object, source_url: str, hits: List[ExtractionHit]) -> None:
             if val and isinstance(val, str):
                 raw = val.replace("mailto:", "").strip()
                 if raw:
-                    hits.append(ExtractionHit(
-                        contact_type="email",
-                        raw_value=raw,
-                        normalized_value=raw,
-                        method="schema",
-                        confidence="high",
-                        source_url=source_url,
-                    ))
+                    hits.append(
+                        ExtractionHit(
+                            contact_type="email",
+                            raw_value=raw,
+                            normalized_value=raw,
+                            method="schema",
+                            confidence="high",
+                            source_url=source_url,
+                        )
+                    )
 
         for key in ("telephone", "faxNumber", "contactPhone"):
             val = node.get(key, "")
             if val and isinstance(val, str):
                 raw = val.replace("tel:", "").strip()
                 if raw:
-                    hits.append(ExtractionHit(
-                        contact_type="phone",
-                        raw_value=raw,
-                        normalized_value=raw,
-                        method="schema",
-                        confidence="high",
-                        source_url=source_url,
-                    ))
+                    hits.append(
+                        ExtractionHit(
+                            contact_type="phone",
+                            raw_value=raw,
+                            normalized_value=raw,
+                            method="schema",
+                            confidence="high",
+                            source_url=source_url,
+                        )
+                    )
 
     for value in node.values():
         if isinstance(value, (dict, list)):
@@ -152,19 +189,21 @@ def _extract_microdata(
     # telephone
     for el in soup.find_all(attrs={"itemprop": "telephone"}):
         raw = (
-            el.get("content")          # <meta itemprop="telephone" content="...">
+            el.get("content")  # <meta itemprop="telephone" content="...">
             or el.get("href", "").replace("tel:", "")
             or el.get_text(strip=True)
         ).strip()
         if raw:
-            hits.append(ExtractionHit(
-                contact_type="phone",
-                raw_value=raw,
-                normalized_value=raw,
-                method="microdata",
-                confidence=_confidence_for(el),
-                source_url=source_url,
-            ))
+            hits.append(
+                ExtractionHit(
+                    contact_type="phone",
+                    raw_value=raw,
+                    normalized_value=raw,
+                    method="microdata",
+                    confidence=_confidence_for(el),
+                    source_url=source_url,
+                )
+            )
 
     # email
     for el in soup.find_all(attrs={"itemprop": "email"}):
@@ -174,14 +213,16 @@ def _extract_microdata(
             or el.get_text(strip=True)
         ).strip()
         if raw:
-            hits.append(ExtractionHit(
-                contact_type="email",
-                raw_value=raw,
-                normalized_value=raw,
-                method="microdata",
-                confidence=_confidence_for(el),
-                source_url=source_url,
-            ))
+            hits.append(
+                ExtractionHit(
+                    contact_type="email",
+                    raw_value=raw,
+                    normalized_value=raw,
+                    method="microdata",
+                    confidence=_confidence_for(el),
+                    source_url=source_url,
+                )
+            )
 
 
 # ── Meta tags ──
@@ -204,22 +245,26 @@ def _extract_meta(
             continue
 
         if key in _META_PHONE_PROPS:
-            hits.append(ExtractionHit(
-                contact_type="phone",
-                raw_value=content,
-                normalized_value=content,
-                method="meta",
-                confidence="medium",
-                source_url=source_url,
-            ))
-        elif key in _META_EMAIL_PROPS:
-            raw = content.replace("mailto:", "").split("?")[0].strip()
-            if raw:
-                hits.append(ExtractionHit(
-                    contact_type="email",
-                    raw_value=raw,
-                    normalized_value=raw,
+            hits.append(
+                ExtractionHit(
+                    contact_type="phone",
+                    raw_value=content,
+                    normalized_value=content,
                     method="meta",
                     confidence="medium",
                     source_url=source_url,
-                ))
+                )
+            )
+        elif key in _META_EMAIL_PROPS:
+            raw = content.replace("mailto:", "").split("?")[0].strip()
+            if raw:
+                hits.append(
+                    ExtractionHit(
+                        contact_type="email",
+                        raw_value=raw,
+                        normalized_value=raw,
+                        method="meta",
+                        confidence="medium",
+                        source_url=source_url,
+                    )
+                )

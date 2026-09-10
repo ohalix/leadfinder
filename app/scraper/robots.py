@@ -1,16 +1,9 @@
-"""
-robots.txt compliance layer.
-
-Uses the `protego` library (same parser Scrapy uses) for correct
-wildcard handling and crawl-delay support.
-
-The robots rules for each domain are cached in-memory for the lifetime
-of the process — one fetch per domain per run, not one per URL.
-"""
 from __future__ import annotations
+
 import logging
 import time
 from typing import Dict, Optional, Tuple
+
 import httpx
 from protego import Protego
 
@@ -41,12 +34,16 @@ def is_allowed(url: str, domain: str, user_agent: str, timeout: int = 5) -> bool
 
     return allowed
 
+
 def clear_cache() -> None:
     """Reset the per-process cache (useful in tests)."""
     _cache.clear()
 
+
 # ── Private ──
-def _load(domain: str, user_agent: str, timeout: int) -> Tuple[Optional[Protego], float]:
+def _load(
+    domain: str, user_agent: str, timeout: int
+) -> Tuple[Optional[Protego], float]:
     raw = _fetch_robots_txt(domain, user_agent, timeout)
     if raw is None:
         return None, 0.0
@@ -59,6 +56,7 @@ def _load(domain: str, user_agent: str, timeout: int) -> Tuple[Optional[Protego]
     except Exception as exc:
         logger.debug(f"Failed to parse robots.txt for {domain}: {exc}")
         return None, 0.0
+
 
 def _fetch_robots_txt(domain: str, user_agent: str, timeout: int) -> Optional[str]:
     for scheme in ("https", "http"):

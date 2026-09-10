@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 import logging
+
 from flask import Blueprint, render_template, request
+
 from app.storage import repository
 
 views_bp = Blueprint("views", __name__)
@@ -9,11 +12,11 @@ logger = logging.getLogger(__name__)
 
 @views_bp.route("/")
 def index():
-    total_leads      = repository.count_leads()
-    total_runs       = repository.count_runs()
-    recent_runs      = repository.get_all_runs(limit=5)
-    by_confidence    = repository.leads_by_confidence()
-    by_type          = repository.leads_by_type()
+    total_leads = repository.count_leads()
+    total_runs = repository.count_runs()
+    recent_runs = repository.get_all_runs(limit=5)
+    by_confidence = repository.leads_by_confidence()
+    by_type = repository.leads_by_type()
     return render_template(
         "index.html",
         total_leads=total_leads,
@@ -23,18 +26,20 @@ def index():
         by_type=by_type,
     )
 
+
 @views_bp.route("/search")
 def search():
     return render_template("search.html")
 
+
 @views_bp.route("/leads")
 def leads():
-    q            = request.args.get("query") or ""
-    domain       = request.args.get("domain") or ""
-    confidence   = request.args.get("confidence") or ""
+    q = request.args.get("query") or ""
+    domain = request.args.get("domain") or ""
+    confidence = request.args.get("confidence") or ""
     contact_type = request.args.get("contact_type") or ""
-    date_from    = request.args.get("date_from") or ""
-    date_to      = request.args.get("date_to") or ""
+    date_from = request.args.get("date_from") or ""
+    date_to = request.args.get("date_to") or ""
 
     leads_data = repository.query_leads(
         query=q or None,
@@ -51,15 +56,16 @@ def leads():
         "leads.html",
         leads=leads_data,
         filters={
-            "query":        q,
-            "domain":       domain,
-            "confidence":   confidence,
+            "query": q,
+            "domain": domain,
+            "confidence": confidence,
             "contact_type": contact_type,
-            "date_from":    date_from,
-            "date_to":      date_to,
+            "date_from": date_from,
+            "date_to": date_to,
         },
         total=len(leads_data),
     )
+
 
 @views_bp.route("/leads/export")
 def leads_export():

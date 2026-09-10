@@ -1,30 +1,31 @@
 from __future__ import annotations
+
 import re
 from typing import Optional
 
 # Minimal but sufficient syntax check
-_EMAIL_RE = re.compile(
-    r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
-)
+_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
-_JUNK_FRAGMENTS = frozenset({
-    "example.com",
-    "test@test.",
-    "noreply@",
-    "no-reply@",
-    "donotreply@",
-    "name@",
-    "user@domain",
-    "email@domain",
-    "your@email",
-    "yourname@",
-    "@sentry.",
-    "info@example",
-    "@2x.",
-    "@3x.",
-    ".png@",
-    ".jpg@",
-})
+_JUNK_FRAGMENTS = frozenset(
+    {
+        "example.com",
+        "test@test.",
+        "noreply@",
+        "no-reply@",
+        "donotreply@",
+        "name@",
+        "user@domain",
+        "email@domain",
+        "your@email",
+        "yourname@",
+        "@sentry.",
+        "info@example",
+        "@2x.",
+        "@3x.",
+        ".png@",
+        ".jpg@",
+    }
+)
 
 
 def normalize_email(raw: str) -> Optional[str]:
@@ -52,6 +53,7 @@ def normalize_email(raw: str) -> Optional[str]:
         return None
 
     return val
+
 
 def is_junk_email(normalized: str) -> bool:
     if not normalized:

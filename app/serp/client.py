@@ -1,8 +1,11 @@
 from __future__ import annotations
+
 import logging
 from typing import List
 from urllib.parse import urlparse
+
 import httpx
+
 from app.models import SerpResult
 
 logger = logging.getLogger(__name__)
@@ -12,12 +15,11 @@ SERPAPI_BASE = "https://serpapi.com/search.json"
 class SerpAPIError(Exception):
     pass
 
+
 class SerpAPIClient:
     def __init__(self, api_key: str) -> None:
         if not api_key:
-            raise SerpAPIError(
-                f"SERP_API_KEY is not set.\nAdd it to your .env file."
-            )
+            raise SerpAPIError(f"SERP_API_KEY is not set.\nAdd it to your .env file.")
         self._key = api_key
 
     def search(self, query: str, max_results: int = 10) -> List[SerpResult]:
@@ -32,9 +34,7 @@ class SerpAPIClient:
 
         while len(collected) < max_results:
             want = min(page_size, max_results - len(collected))
-            logger.info(
-                f"SerpAPI request — query={query} start={start}"
-            )
+            logger.info(f"SerpAPI request — query={query} start={start}")
             try:
                 data = self._request(query, start=start)
             except SerpAPIError as exc:
@@ -49,10 +49,9 @@ class SerpAPIClient:
             collected.extend(page)
             logger.info(f"SerpAPI: page_len={len(page)} collected={len(collected)}")
 
-            next_link = (
-                data.get("serpapi_pagination", {}).get("next")
-                or data.get("pagination", {}).get("next_link")
-            )
+            next_link = data.get("serpapi_pagination", {}).get("next") or data.get(
+                "pagination", {}
+            ).get("next_link")
 
             if not next_link:
                 break
@@ -61,7 +60,9 @@ class SerpAPIClient:
 
         return collected[:max_results]
 
-    def search_local_pack(self, query: str, location: str = "", max_results: int = 10) -> tuple:
+    def search_local_pack(
+        self, query: str, location: str = "", max_results: int = 10
+    ) -> tuple:
         """
         Calls the SerpAPI Google Local Pack endpoint with pagination.
 
@@ -73,7 +74,7 @@ class SerpAPIClient:
         Returns: (places: List[dict], total_count: int)
         """
         LP_PAGE_SIZE = 20
-        LP_MAX_CAP   = 60
+        LP_MAX_CAP = 60
         effective_max = min(max_results, LP_MAX_CAP)
 
         collected: list = []
@@ -84,7 +85,9 @@ class SerpAPIClient:
             try:
                 data = self._request_local_pack(query, start=start, location=location)
             except Exception as exc:
-                logger.warning(f"SerpAPI local pack request failed at start={start}: {exc}")
+                logger.warning(
+                    f"SerpAPI local pack request failed at start={start}: {exc}"
+                )
                 break
 
             if "error" in data:
@@ -100,23 +103,28 @@ class SerpAPIClient:
                 break
 
             collected.extend(page)
-            logger.info(f"SerpAPI local pack: page_len={len(page)} collected={len(collected)}")
+            logger.info(
+                f"SerpAPI local pack: page_len={len(page)} collected={len(collected)}"
+            )
 
             # Check for next page signal
-            next_link = (
-                data.get("serpapi_pagination", {}).get("next")
-                or data.get("pagination", {}).get("next_link")
-            )
+            next_link = data.get("serpapi_pagination", {}).get("next") or data.get(
+                "pagination", {}
+            ).get("next_link")
             if not next_link:
                 break
 
             start += LP_PAGE_SIZE
 
         results = collected[:effective_max]
-        logger.info(f"SerpAPI local pack: {len(results)} place(s) total (cap={effective_max})")
+        logger.info(
+            f"SerpAPI local pack: {len(results)} place(s) total (cap={effective_max})"
+        )
         return results, len(results)
 
-    def _request_local_pack(self, query: str, start: int = 0, location: str = "") -> dict:
+    def _request_local_pack(
+        self, query: str, start: int = 0, location: str = ""
+    ) -> dict:
         params = {
             "q": query,
             "api_key": self._key,
@@ -198,12 +206,12 @@ class SerpAPIClient:
                             continue
                         results.append(
                             SerpResult(
-                                url= url,
-                                title= ref.get("title", ""),
-                                snippet= ref.get("snippet", ""),
-                                domain= _domain(url),
-                                rank= ref.get("index", ""),
-                                source_type= "ai_overview"
+                                url=url,
+                                title=ref.get("title", ""),
+                                snippet=ref.get("snippet", ""),
+                                domain=_domain(url),
+                                rank=ref.get("index", ""),
+                                source_type="ai_overview",
                             )
                         )
                 elif block.get("type") == "list":
@@ -215,15 +223,15 @@ class SerpAPIClient:
                                     continue
                                 results.append(
                                     SerpResult(
-                                        url= url,
-                                        title= list_item.get("title", ""),
-                                        snippet= ref.get("text", ""),
-                                        domain= _domain(url),
-                                        rank= ref.get("index", ""),
-                                        source_type= "ai_overview"
+                                        url=url,
+                                        title=list_item.get("title", ""),
+                                        snippet=ref.get("text", ""),
+                                        domain=_domain(url),
+                                        rank=ref.get("index", ""),
+                                        source_type="ai_overview",
                                     )
                                 )
-                
+
             for ref in (data.get("ai_overview") or {}).get("references") or []:
                 url = (ref.get("url") or "").strip()
                 if not url:
@@ -238,7 +246,7 @@ class SerpAPIClient:
                         source_type="ai_overview",
                     )
                 )
-                
+
         if "places_sites" in data:
             for place in data.get("places_sites"):
                 url = (place.get("link") or "").strip()
@@ -254,13 +262,13 @@ class SerpAPIClient:
                         source_type="places_sites",
                     )
                 )
-            
+
         if "related_brands" in data:
             for related in data.get("related_brands"):
                 rank = 1
                 url = (related.get("link") or "").strip()
                 if not url:
-                    continue    
+                    continue
                 results.append(
                     SerpResult(
                         url=url,
@@ -271,13 +279,13 @@ class SerpAPIClient:
                         source_type="related_brands",
                     )
                 )
-                rank =+ 1
-        
+                rank = +1
+
         if "product_sites" in data:
             for product_site in data.get("product_sites"):
                 url = (product_site.get("link") or "").strip()
                 if not url:
-                    continue    
+                    continue
                 results.append(
                     SerpResult(
                         url=url,
@@ -288,7 +296,7 @@ class SerpAPIClient:
                         source_type="product_sites",
                     )
                 )
-                
+
         if "local_results" in data:
             for place in (data.get("local_results") or {}).get("places") or []:
                 url = (place.get("links") or {}).get("website", "").strip()
@@ -305,44 +313,47 @@ class SerpAPIClient:
                         source_type="local_pack",
                     )
                 )
-        
+
         return results
 
     def _parse_local_places(self, places: list) -> List[dict]:
         results = []
         for place in places:
-            phone   = (place.get("phone") or "").strip()
+            phone = (place.get("phone") or "").strip()
             website = (place.get("links") or {}).get("website", "").strip()
 
             if not phone and not website:
                 continue
 
-            results.append({
-                "title":             place.get("title", ""),
-                "phone":             phone,
-                "website":           website,
-                "domain":            _domain(website) if website else "",
-                "address":           place.get("address", ""),
-                "type":              place.get("type", ""),
-                "rating":            place.get("rating"),
-                "reviews":           place.get("reviews"),
-                "description":       (place.get("description") or "").strip(),
-                "hours":             place.get("hours", ""),
-                "years_in_business": place.get("years_in_business", ""),
-                "position":          place.get("position"),
-                "gps_coordinates":   place.get("gps_coordinates"),
-                "place_id":          place.get("place_id", ""),
-            })
+            results.append(
+                {
+                    "title": place.get("title", ""),
+                    "phone": phone,
+                    "website": website,
+                    "domain": _domain(website) if website else "",
+                    "address": place.get("address", ""),
+                    "type": place.get("type", ""),
+                    "rating": place.get("rating"),
+                    "reviews": place.get("reviews"),
+                    "description": (place.get("description") or "").strip(),
+                    "hours": place.get("hours", ""),
+                    "years_in_business": place.get("years_in_business", ""),
+                    "position": place.get("position"),
+                    "gps_coordinates": place.get("gps_coordinates"),
+                    "place_id": place.get("place_id", ""),
+                }
+            )
         return results
+
 
 def get_serp_client(provider: str, api_key: str) -> SerpAPIClient:
     norm = provider.lower().replace("-", "_").replace(" ", "_")
     if norm in ("serpapi", "serp_api"):
         return SerpAPIClient(api_key)
     raise ValueError(
-        f"Unsupported SERP provider: {provider!r}.  "
-        "Supported values: 'serpapi'"
+        f"Unsupported SERP provider: {provider!r}.  Supported values: 'serpapi'"
     )
+
 
 def _domain(url: str) -> str:
     try:

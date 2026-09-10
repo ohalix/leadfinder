@@ -1,30 +1,9 @@
-"""
-LeadFinder test suite.
-
-Covers:
-  - App factory / config / routes
-  - Email normalization and junk filtering
-  - Phone normalization and junk filtering
-  - Deduplication (within-page and cross-page)
-  - Confidence scoring
-  - Extraction tiers (structured, patterns)
-  - Contact-page discovery
-  - Storage / repository (isolated temp DB)
-  - API endpoints (health, stats, leads, search validation)
-
-Run: python -m pytest tests/ -v
-"""
-
 from __future__ import annotations
 
 import os
 import tempfile
 
 import pytest
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Fixtures
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture(scope="session")

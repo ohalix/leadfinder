@@ -1,6 +1,6 @@
-
 import logging
 import sys
+
 
 def setup_logging(app) -> None:
     log_level_name = app.config.get("LOG_LEVEL", "INFO").upper()

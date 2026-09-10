@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging
 import os
 import sqlite3
@@ -25,6 +26,7 @@ def init_db(app) -> None:
     except Exception as e:
         logger.warning(f"Error creating Directory/Database: {e}")
 
+
 @contextmanager
 def get_conn() -> Generator[sqlite3.Connection, None, None]:
     """
@@ -41,6 +43,7 @@ def get_conn() -> Generator[sqlite3.Connection, None, None]:
     finally:
         conn.close()
 
+
 # ── Private ──
 def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(
@@ -52,6 +55,7 @@ def _connect() -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA synchronous=NORMAL")  # safe with WAL, faster than FULL
     return conn
+
 
 def _create_schema(conn: sqlite3.Connection) -> None:
     conn.executescript("""

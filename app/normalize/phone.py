@@ -1,16 +1,5 @@
-"""
-Phone number normalization.
-
-Uses Google's `phonenumbers` library (libphonenumber port) for correct
-E.164 formatting and validity checking.
-
-A configurable default_region is used when no country code prefix is present
-in the raw number (most common for US/CA numbers written without +1).
-
-Degrades gracefully if the library is somehow missing (returns raw string
-after basic sanity checks).
-"""
 from __future__ import annotations
+
 import logging
 import re
 from typing import Optional
@@ -20,11 +9,10 @@ logger = logging.getLogger(__name__)
 try:
     import phonenumbers
     from phonenumbers import NumberParseException, PhoneNumberFormat
+
     _LIB_OK = True
 except ImportError:
-    logger.warning(
-        "phonenumbers not installed — phone normalisation will be limited."
-    )
+    logger.warning("phonenumbers not installed — phone normalisation will be limited.")
     _LIB_OK = False
 
 # Pre-filter: reject obviously non-numeric or too-short strings early

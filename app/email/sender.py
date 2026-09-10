@@ -1,17 +1,3 @@
-"""
-Email send orchestrator.
-
-Called from the API route in a ThreadPoolExecutor thread.
-Iterates over a list of lead dicts, renders the subject/body template
-for each recipient, calls smtp.send_one(), records the outcome in the
-email_sends table, and respects the configurable rate delay.
-
-Template variables available in subject and body:
-  {email}   — the recipient email address
-  {domain}  — the source domain of the lead
-  {query}   — the originating search query (first one if multiple)
-"""
-
 from __future__ import annotations
 
 import logging

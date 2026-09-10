@@ -1,17 +1,3 @@
-"""
-SMTP send primitive.
-
-Uses stdlib smtplib + email.mime — zero new dependencies.
-Works with any SMTP provider (Gmail, Outlook, Mailgun, SendGrid SMTP relay, etc.)
-configured via environment variables.
-
-SMTP_HOST     — e.g. smtp.gmail.com
-SMTP_PORT     — 587 (STARTTLS, recommended) or 465 (SSL)
-SMTP_USERNAME — your login / address
-SMTP_PASSWORD — app password or API key depending on provider
-SMTP_FROM     — sender address (can differ from username on some providers)
-SMTP_USE_TLS  — true (default, STARTTLS on port 587) / false (port 465 SSL)
-"""
 from __future__ import annotations
 
 import logging
@@ -42,20 +28,20 @@ def send_one(
     Opens a fresh SMTP connection per message to avoid state issues
     in a multi-threaded context.
     """
-    host      = smtp_cfg.get("host", "")
-    port      = int(smtp_cfg.get("port", 587))
-    username  = smtp_cfg.get("username", "")
-    password  = smtp_cfg.get("password", "")
+    host = smtp_cfg.get("host", "")
+    port = int(smtp_cfg.get("port", 587))
+    username = smtp_cfg.get("username", "")
+    password = smtp_cfg.get("password", "")
     from_addr = smtp_cfg.get("from_email") or username
     from_name = smtp_cfg.get("from_name", "LeadFinder")
-    use_tls   = smtp_cfg.get("use_tls", True)
+    use_tls = smtp_cfg.get("use_tls", True)
 
     if not host or not username:
         raise SMTPError("SMTP host and username are required")
 
     msg = MIMEMultipart("alternative")
-    msg["From"]    = f"{from_name} <{from_addr}>"
-    msg["To"]      = to
+    msg["From"] = f"{from_name} <{from_addr}>"
+    msg["To"] = to
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "html" if html_body else "plain", "utf-8"))
 
@@ -70,7 +56,9 @@ def send_one(
                 server.send_message(msg)
         else:
             # SSL on port 465
-            with smtplib.SMTP_SSL(host, port, context=ssl.create_default_context(), timeout=30) as server:
+            with smtplib.SMTP_SSL(
+                host, port, context=ssl.create_default_context(), timeout=30
+            ) as server:
                 server.login(username, password)
                 server.send_message(msg)
     except smtplib.SMTPAuthenticationError as exc:

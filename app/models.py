@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional
+
 
 @dataclass
 class SerpResult:
@@ -13,6 +15,7 @@ class SerpResult:
     rank: int
     # organic | answer_box | ai_overview
     source_type: str = "organic"
+
 
 @dataclass
 class FetchOutcome:
@@ -27,14 +30,15 @@ class FetchOutcome:
 
 @dataclass
 class ExtractionHit:
-    contact_type: str          # email | phone
+    contact_type: str  # email | phone
     raw_value: str
-    normalized_value: str      # filled in by normalize layer
+    normalized_value: str  # filled in by normalize layer
     # schema | mailto | tel | footer | text | playwright
     method: str
     # high | medium | low  (re-scored by confidence.py)
     confidence: str
     source_url: str
+
 
 @dataclass
 class Lead:
@@ -50,6 +54,7 @@ class Lead:
     seen_count: int = 1
     first_seen: datetime = field(default_factory=datetime.utcnow)
     last_seen: datetime = field(default_factory=datetime.utcnow)
+
 
 @dataclass
 class RunSummary:

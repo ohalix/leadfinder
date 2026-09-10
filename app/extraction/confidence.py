@@ -1,14 +1,28 @@
 from __future__ import annotations
+
 from typing import List
 from urllib.parse import urlparse
+
 from app.models import ExtractionHit
 
-_FREEMAIL = frozenset({
-    "gmail.com", "yahoo.com", "hotmail.com", "outlook.com",
-    "icloud.com", "protonmail.com", "proton.me",
-    "aol.com", "mail.com", "zoho.com", "yandex.com",
-    "live.com", "msn.com", "me.com",
-})
+_FREEMAIL = frozenset(
+    {
+        "gmail.com",
+        "yahoo.com",
+        "hotmail.com",
+        "outlook.com",
+        "icloud.com",
+        "protonmail.com",
+        "proton.me",
+        "aol.com",
+        "mail.com",
+        "zoho.com",
+        "yandex.com",
+        "live.com",
+        "msn.com",
+        "me.com",
+    }
+)
 _ORD = {"high": 3, "medium": 2, "low": 1}
 _LBL = {3: "high", 2: "medium", 1: "low"}
 
@@ -27,11 +41,13 @@ def score_hits(hits: List[ExtractionHit], site_domain: str) -> List[ExtractionHi
 
     return hits
 
+
 def site_domain(url: str) -> str:
     try:
         return urlparse(url).netloc.lower().replace("www.", "")
     except Exception:
         return ""
+
 
 def _email_domain(email: str) -> str:
     parts = email.rsplit("@", 1)
